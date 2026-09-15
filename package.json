@@ -12,6 +12,7 @@
     "start": "node server/index.mjs --production",
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node scripts/browser-check.mjs",
+    "test:activities": "node scripts/activity-check.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {
