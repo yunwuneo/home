@@ -197,7 +197,10 @@ try {
     .fill('还记得我喜欢什么吗？');
   await page.getByRole('button', { name: '发送消息', exact: true }).click();
   await page
-    .getByText('当然记得，你喜欢抹茶。和你有关的小事，我有认真听。', { exact: true })
+    .locator('.message.assistant')
+    .filter({ hasText: '我记得。' })
+    .filter({ hasText: '抹茶' })
+    .last()
     .waitFor();
   await page.screenshot({ path: join(output, 'mobile-chat.png') });
   await page.getByRole('button', { name: '返回小家', exact: true }).click();

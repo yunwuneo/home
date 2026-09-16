@@ -1,6 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { ACTIVITIES } from '../shared/world.mjs';
 import { PLACES, OUTINGS } from '../shared/places.mjs';
+import { addMemory, learnFromChat } from './memory.mjs';
+import { conversationReply } from './companion.mjs';
+import { publicGame } from './games.mjs';
 
 export function initialState() {
   return {
@@ -47,13 +50,14 @@ export function initialState() {
 }
 export function message(s, role, content, source = 'life') {
   s.messages.push({ id: randomUUID(), role, content, source, day: s.day, minute: s.minute });
-  s.messages = s.messages.slice(-120);
+  s.messages = s.messages.slice(-500);
+  return s.messages.at(-1);
 }
 export function remember(s, title, text, kind = 'daily') {
-  s.memories.unshift({ id: randomUUID(), day: s.day, minute: s.minute, title, text, kind });
-  s.memories = s.memories.slice(0, 150);
+  addMemory(s, { title, text, kind, source: 'life' });
 }
 export function startActivity(s, kind, together = true) {
+  if (s.game?.status === 'playing') throw new Error('先结束游戏，再一起活动吧。');
   const a = ACTIVITIES[kind];
   if (!a) throw new Error('没有找到这项活动。');
   if ((a.place || 'home') !== (s.location || 'home'))
@@ -74,6 +78,7 @@ export function startActivity(s, kind, together = true) {
   s.lastAuto = s.elapsed;
 }
 export function travel(s, location) {
+  if (s.game?.status === 'playing') throw new Error('先结束这一局，再一起出门吧。');
   if (!Object.hasOwn(PLACES, location)) throw new Error('没有找到这个地点。');
   if ((s.location || 'home') === location) return;
   const place = PLACES[location];
@@ -92,6 +97,7 @@ export function travel(s, location) {
   );
 }
 export function advance(s, seconds) {
+  if (s.game?.status === 'playing') return false;
   if (!s.speed) return false;
   const delta = Math.min(seconds, 5) * s.speed;
   s.elapsed += delta;
@@ -186,29 +192,22 @@ export function advance(s, seconds) {
   return true;
 }
 export function publicState(s, configured) {
-  const { warmth, lastAuto, elapsed, ...rest } = s;
+  const { warmth, lastAuto, elapsed, game, chatRequests, conversation, companion, ...rest } = s;
   return {
     ...rest,
+    game: publicGame(game),
+    gameStats: s.gameStats || {},
+    companion: companion ? { pending: companion.pending, lastLine: companion.lastLine } : null,
     location: s.location || 'home',
     configured,
     relationship: warmth < 6 ? '开始熟悉彼此' : warmth < 15 ? '慢慢靠近' : '心照不宣的陪伴',
   };
 }
-export function localReply(s, text) {
+export function localReply(s, text, learned = learnFromChat(s, text)) {
+  const reply = conversationReply(s, text, learned);
+  if (reply) return reply;
   if (/记得|喜欢什么/.test(text) && s.preferences.length)
     return `当然记得，你${s.preferences.slice(-3).join('，还')}。和你有关的小事，我有认真听。`;
-  const preference = /[？?]|什么|吗/.test(text)
-    ? null
-    : text.match(/^(?:我喜欢|我爱吃|我爱喝)([^。！？\n]{1,45})/);
-  if (preference) {
-    const fact = `喜欢${preference[1].trim()}`;
-    if (!s.preferences.includes(fact)) {
-      s.preferences.push(fact);
-      s.preferences = s.preferences.slice(-30);
-      remember(s, '关于你的小事', `${s.playerName}${fact}。`, 'preference');
-    }
-    return `原来你${fact}，记住啦。以后在家里，也想多准备一些你喜欢的东西。`;
-  }
   if (/累|难过|不开心|压力/.test(text))
     return '今天辛苦啦。你可以慢慢说，也可以先安静地坐一会儿，我在这里陪你。';
   if (/你好|早安|晚安/.test(text))

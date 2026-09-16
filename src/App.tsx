@@ -49,16 +49,30 @@ import {
   Building2,
   Trees,
   Focus,
+  Gamepad2,
+  BookmarkPlus,
+  Quote,
+  Search,
 } from 'lucide-react';
-import { api, ApiError } from './api';
+import { api, ApiError, chatStream } from './api';
 import LanLogin from './LanLogin';
 import type { ActivityKind, PlaceId, Settings, State, View } from './types';
 import { ACTIVITIES } from '../shared/world.mjs';
 import { PLACES } from '../shared/places.mjs';
 import { CAMERA_VIEWS } from './cameraViews';
 import CityMap from './CityMap';
+import MemoryPanel from './MemoryPanel';
+import TogetherPanel from './TogetherPanel';
 
 const World = lazy(() => import('./World'));
+function requestUuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 const icons = {
   shop: ShoppingBasket,
   movie: Clapperboard,
@@ -195,6 +209,7 @@ function SettingsDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         model: local ? '' : settings.model,
         apiKey: local ? '' : key,
         clearKey: local || clearKey,
+        streaming: settings.streaming !== false,
         playerName: settings.playerName,
       });
       setSettings(result);
@@ -302,6 +317,14 @@ function SettingsDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                   清除已保存的密钥
                 </label>
               )}
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={settings.streaming !== false}
+                  onChange={(e) => setSettings({ ...settings, streaming: e.target.checked })}
+                />
+                逐段接收回复
+              </label>
             </fieldset>
             <div className={`form-feedback ${failed ? 'error' : 'success'}`} role="status">
               {feedback}
@@ -408,14 +431,35 @@ export default function App() {
     [reset, setReset] = useState(0),
     [zoom, setZoom] = useState(1),
     [more, setMore] = useState(false),
-    [draft, setDraft] = useState(''),
+    [draft, setDraft] = useState(() => {
+      try {
+        return sessionStorage.getItem('echo-chat-draft') || '';
+      } catch {
+        return '';
+      }
+    }),
     [sending, setSending] = useState(false),
     [acting, setActing] = useState(false),
     [pendingMessage, setPendingMessage] = useState(''),
     [mobileChat, setMobileChat] = useState(false);
-  const [journalFilter, setJournalFilter] = useState('all'),
-    [autoScroll, setAutoScroll] = useState(true),
+  const [autoScroll, setAutoScroll] = useState(true),
     [unread, setUnread] = useState(false);
+  const [streamed, setStreamed] = useState('');
+  const [quote, setQuote] = useState<State['messages'][number] | null>(null);
+  const [chatSearch, setChatSearch] = useState(''),
+    [showChatSearch, setShowChatSearch] = useState(false);
+  const [failedMessage, setFailedMessage] = useState<{
+    text: string;
+    requestId: string;
+    replyToId?: string;
+  } | null>(null);
+  const sendingRef = useRef(false),
+    actingRef = useRef(false);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('echo-chat-draft', draft);
+    } catch {}
+  }, [draft]);
   const closeSettings = useCallback(() => setShowSettings(false), []);
   useEffect(() => {
     setFocus(null);
@@ -472,7 +516,8 @@ export default function App() {
     const stamp = generation.current;
     try {
       const result = await api<State>('/state');
-      if (stamp === generation.current) setState(result);
+      if (stamp === generation.current && !sendingRef.current && !actingRef.current)
+        setState(result);
       setNeedsPairing(false);
       setConnected(true);
     } catch (error) {
@@ -496,13 +541,15 @@ export default function App() {
   useEffect(() => {
     if (autoScroll && log.current) log.current.scrollTop = log.current.scrollHeight;
     else setUnread(true);
-  }, [state?.messages.length, state?.messages.at(-1)?.id, pendingMessage, autoScroll]);
+  }, [state?.messages.length, state?.messages.at(-1)?.id, pendingMessage, streamed, autoScroll]);
   useEffect(() => {
     if (!error) return;
     const timer = setTimeout(() => setError(''), 6500);
     return () => clearTimeout(timer);
   }, [error]);
   async function action(path: string, body: unknown) {
+    if (actingRef.current) return false;
+    actingRef.current = true;
     generation.current++;
     setActing(true);
     try {
@@ -511,10 +558,12 @@ export default function App() {
       return true;
     } catch (e) {
       setError((e as Error).message);
+      void refresh();
       return false;
     } finally {
       generation.current++;
       setActing(false);
+      actingRef.current = false;
     }
   }
   async function activity(kind: ActivityKind) {
@@ -524,22 +573,39 @@ export default function App() {
     setMore(false);
     await action('/activity', { kind });
   }
-  async function send(text: string) {
-    if (!text.trim() || sending) return;
+  async function send(text: string, retry = false) {
+    if (!text.trim() || sendingRef.current) return;
     const value = text.trim();
+    const request =
+      failedMessage &&
+      (retry || (failedMessage.text === value && failedMessage.replyToId === quote?.id))
+        ? failedMessage
+        : { text: value, requestId: requestUuid(), replyToId: quote?.id };
+    sendingRef.current = true;
     setSending(true);
     setPendingMessage(value);
+    setStreamed('');
+    setFailedMessage(null);
     setDraft('');
     setAutoScroll(true);
     generation.current++;
     try {
-      setState(await api<State>('/chat', { text: value }));
+      setState(
+        await chatStream<State>({ ...request, stream: true }, (part) =>
+          setStreamed((text) => text + part),
+        ),
+      );
+      setQuote(null);
+      setConnected(true);
     } catch (e) {
       setDraft(value);
+      setFailedMessage(request);
       setError((e as Error).message);
     } finally {
       setSending(false);
+      sendingRef.current = false;
       setPendingMessage('');
+      setStreamed('');
       generation.current++;
       input.current?.focus();
     }
@@ -600,6 +666,9 @@ export default function App() {
   const suggestions = state.preferences.length
     ? ['还记得我喜欢什么吗？', '今天和你一起很开心。', '你现在在想什么？']
     : ['今天想做什么？', '你喜欢这个家吗？', '我喜欢抹茶。'];
+  const chatMessages = state.messages.filter(
+    (m) => !chatSearch || m.content.toLowerCase().includes(chatSearch.toLowerCase()),
+  );
   return (
     <div className={`app ${mobileChat ? 'chat-open' : ''}`}>
       <header className="topbar">
@@ -617,6 +686,7 @@ export default function App() {
           {(
             [
               { id: 'home', label: '小家', icon: Home },
+              { id: 'together', label: '一起玩', icon: Gamepad2 },
               { id: 'journal', label: '回忆手记', icon: BookOpen },
               { id: 'routine', label: '今日生活', icon: Sun },
             ] as const
@@ -624,7 +694,11 @@ export default function App() {
             <button
               key={item.id}
               className={view === item.id ? 'active' : ''}
-              onClick={() => setView(item.id)}
+              onClick={() => {
+                setView(item.id);
+                setMobileChat(false);
+              }}
+              aria-label={item.label}
             >
               <item.icon size={17} />
               <span>{item.label}</span>
@@ -805,6 +879,10 @@ export default function App() {
             >
               <Map size={18} />
               <span>生活地图</span>
+            </button>
+            <button className="place-map-button play-together" onClick={() => setView('together')}>
+              <Gamepad2 size={18} />
+              <span>{state.game?.status === 'playing' ? '继续这一局' : '一起玩'}</span>
             </button>
             {focus && (
               <button
@@ -990,16 +1068,26 @@ export default function App() {
             <div className="page-title">
               <div>
                 <span className="eyebrow">
-                  {view === 'journal' ? 'LITTLE THINGS, TOGETHER' : 'A DAY AT HOME'}
+                  {view === 'journal'
+                    ? 'LITTLE THINGS, TOGETHER'
+                    : view === 'together'
+                      ? 'A LITTLE CLOSER'
+                      : 'A DAY AT HOME'}
                 </span>
                 <h2>
-                  {view === 'journal' ? '回忆手记' : '今日生活'}
+                  {view === 'journal'
+                    ? '回忆手记'
+                    : view === 'together'
+                      ? '和 Echo，一起'
+                      : '今日生活'}
                   <Flower2 size={26} />
                 </h2>
                 <p>
                   {view === 'journal'
                     ? '那些想要好好记住的小事。'
-                    : `第 ${state.day} 天 · ${time(state.minute)}`}
+                    : view === 'together'
+                      ? `第 ${state.day} 天 · 今晚的时间留给彼此`
+                      : `第 ${state.day} 天 · ${time(state.minute)}`}
                 </p>
               </div>
               <IconButton label="返回小家" onClick={() => setView('home')}>
@@ -1007,53 +1095,9 @@ export default function App() {
               </IconButton>
             </div>
             {view === 'journal' ? (
-              <>
-                <div className="filter-tabs">
-                  <button
-                    className={journalFilter === 'all' ? 'active' : ''}
-                    onClick={() => setJournalFilter('all')}
-                  >
-                    全部回忆<span>{state.memories.length}</span>
-                  </button>
-                  <button
-                    className={journalFilter === 'preference' ? 'active' : ''}
-                    onClick={() => setJournalFilter('preference')}
-                  >
-                    关于你
-                  </button>
-                </div>
-                <div className="memory-list">
-                  {state.memories
-                    .filter((m) => journalFilter === 'all' || m.kind === 'preference')
-                    .map((memory) => (
-                      <article className="memory-entry" key={memory.id}>
-                        <span className={`memory-symbol ${memory.kind}`}>
-                          {memory.kind === 'preference' ? (
-                            <Heart size={20} />
-                          ) : memory.kind === 'milestone' ? (
-                            <Home size={20} />
-                          ) : (
-                            <Flower2 size={20} />
-                          )}
-                        </span>
-                        <div>
-                          <span className="small-label">
-                            第 {memory.day} 天 · {time(memory.minute)}
-                          </span>
-                          <h3>{memory.title}</h3>
-                          <p>{memory.text}</p>
-                        </div>
-                      </article>
-                    ))}
-                  {journalFilter === 'preference' && !state.preferences.length && (
-                    <div className="empty-state">
-                      <Heart size={30} />
-                      <h3>还在慢慢了解你</h3>
-                      <p>属于你的小偏好，会被珍藏在这里。</p>
-                    </div>
-                  )}
-                </div>
-              </>
+              <MemoryPanel state={state} action={action} busy={acting || sending || !connected} />
+            ) : view === 'together' ? (
+              <TogetherPanel state={state} action={action} busy={acting || sending || !connected} />
             ) : (
               <>
                 <div className="routine-summary">
@@ -1158,7 +1202,30 @@ export default function App() {
           <div className="chat-date">
             <span />第 {state.day} 天 · {place.name}
             <span />
+            <button
+              className="icon-button"
+              aria-label="搜索聊天记录"
+              title="搜索聊天记录"
+              onClick={() => {
+                setShowChatSearch(!showChatSearch);
+                setChatSearch('');
+              }}
+            >
+              <Search size={14} />
+            </button>
           </div>
+          {showChatSearch && (
+            <label className="search-field chat-search">
+              <Search size={15} />
+              <input
+                aria-label="搜索聊天内容"
+                placeholder="寻找聊过的话…"
+                value={chatSearch}
+                onChange={(e) => setChatSearch(e.target.value)}
+              />
+              <small>{chatMessages.length}</small>
+            </label>
+          )}
           <div
             className="chat-log"
             ref={log}
@@ -1173,17 +1240,57 @@ export default function App() {
               if (near) setUnread(false);
             }}
           >
-            {state.messages.map((m, index) => (
+            {chatMessages.map((m, index) => (
               <div className={`message ${m.role}`} key={m.id}>
                 {m.role === 'assistant' && <span className="message-avatar">E</span>}
                 <div className="message-body">
-                  {(index === 0 || state.messages[index - 1].role !== m.role) && (
+                  {(index === 0 || chatMessages[index - 1].role !== m.role) && (
                     <div className="message-meta">
                       {m.role === 'assistant' ? 'Echo' : state.playerName}
                       <time>{time(m.minute)}</time>
                     </div>
                   )}
+                  {m.replyTo && (
+                    <blockquote className="quoted-message">{m.replyTo.content}</blockquote>
+                  )}
                   <p>{m.content}</p>
+                  <div className="message-actions">
+                    <button
+                      title="引用回复"
+                      aria-label={`引用第 ${index + 1} 条消息`}
+                      disabled={sending}
+                      onClick={() => {
+                        setQuote(m);
+                        input.current?.focus();
+                      }}
+                    >
+                      <Quote size={12} />
+                    </button>
+                    <button
+                      title="记住这句话"
+                      aria-label={`记住第 ${index + 1} 条消息`}
+                      disabled={sending || acting}
+                      onClick={() =>
+                        void action('/memory', { operation: 'save-message', id: m.id })
+                      }
+                    >
+                      <BookmarkPlus size={12} />
+                    </button>
+                    {m.memoryIds?.some((id) =>
+                      state.memories.some((memory) => memory.id === id),
+                    ) && (
+                      <button
+                        className="memory-link"
+                        onClick={() => {
+                          setView('journal');
+                          setMobileChat(false);
+                        }}
+                      >
+                        <BookOpen size={11} />
+                        相关回忆
+                      </button>
+                    )}
+                  </div>
                   {m.source === 'life' && index > 0 && (
                     <span className="message-source">
                       <Leaf size={10} />
@@ -1201,12 +1308,24 @@ export default function App() {
                     <p>{pendingMessage}</p>
                   </div>
                 </div>
-                <div className="typing">
-                  <span />
-                  <span />
-                  <span />
-                  <small>Echo 正在想怎么说</small>
-                </div>
+                {streamed ? (
+                  <div className="message assistant streaming-message">
+                    <span className="message-avatar">E</span>
+                    <div className="message-body">
+                      <p>
+                        {streamed}
+                        <span className="stream-caret" />
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="typing">
+                    <span />
+                    <span />
+                    <span />
+                    <small>Echo 正在想怎么说</small>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1223,6 +1342,40 @@ export default function App() {
             </button>
           )}
           <div className="chat-bottom">
+            {failedMessage && (
+              <div className="chat-failure" role="alert">
+                <span>这句话还没有发送成功</span>
+                <button
+                  className="text-button"
+                  disabled={sending || !connected}
+                  onClick={() => void send(failedMessage.text, true)}
+                >
+                  <RotateCcw size={14} />
+                  重试
+                </button>
+                <button
+                  className="icon-button"
+                  title="关闭重试提示"
+                  onClick={() => setFailedMessage(null)}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {state.companion?.pending && (
+              <div className="chat-choices">
+                {state.companion.pending.choices.map((choice) => (
+                  <button
+                    key={choice}
+                    disabled={acting || sending || !connected}
+                    onClick={() => void action('/interaction', { kind: 'answer', choice })}
+                  >
+                    {choice}
+                    <ArrowUpRight size={12} />
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="suggestion-heading">
               <Sparkles size={13} />
               此刻想说
@@ -1243,6 +1396,20 @@ export default function App() {
                 void send(draft);
               }}
             >
+              {quote && (
+                <div className="composer-quote">
+                  <Quote size={14} />
+                  <span>{quote.content}</span>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="取消引用"
+                    onClick={() => setQuote(null)}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
               <textarea
                 ref={input}
                 placeholder="和 Echo 说点什么…"

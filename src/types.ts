@@ -20,6 +20,9 @@ export type Message = {
   source: string;
   day: number;
   minute: number;
+  replyTo?: { id: string; content: string; role: string };
+  memoryIds?: string[];
+  memoryExcluded?: boolean;
 };
 export type Memory = {
   id: string;
@@ -28,6 +31,9 @@ export type Memory = {
   title: string;
   text: string;
   kind: string;
+  pinned?: boolean;
+  source?: string;
+  updatedDay?: number;
 };
 export type State = {
   location: PlaceId;
@@ -54,8 +60,16 @@ export type State = {
   preferences: string[];
   configured: boolean;
   completed: string[];
+  chatBusy?: boolean;
+  game: Game | null;
+  gameStats: Record<string, { played: number; wins: number; best: number }>;
+  companion: {
+    pending: { kind: string; label: string; line: string; choices: string[] } | null;
+    lastLine: string;
+  } | null;
 };
 export type Settings = {
+  streaming?: boolean;
   canPair: boolean;
   baseUrl: string;
   model: string;
@@ -63,4 +77,47 @@ export type Settings = {
   playerName: string;
   configured: boolean;
 };
-export type View = 'home' | 'journal' | 'routine';
+export type View = 'home' | 'journal' | 'routine' | 'together';
+export type Recipe = {
+  base: 'jasmine' | 'matcha' | 'black';
+  sweetness: number;
+  ice: number;
+  strength: number;
+};
+type GameBase = {
+  id: string;
+  kind: string;
+  status: 'playing' | 'finished' | 'abandoned';
+  revision: number;
+  difficulty: 'gentle' | 'thoughtful';
+  line: string;
+  result: 'win' | 'loss' | 'draw' | null;
+};
+export type ChessGame = GameBase & {
+  kind: 'chess';
+  fen: string;
+  board: ({ square: string; color: string; type: string } | null)[];
+  legal: { from: string; to: string; promotion?: string }[];
+  moves: string[];
+  check: boolean;
+};
+export type PairsGame = GameBase & {
+  kind: 'pairs';
+  cards: (number | null)[];
+  matched: number[];
+  revealed: number[];
+  turn: 'player' | 'echo';
+  scores: { player: number; echo: number };
+  rounds: number;
+};
+export type DrinksGame = GameBase & {
+  kind: 'drinks';
+  round: number;
+  attempts: number;
+  best: number;
+  scores: number[];
+  served: boolean;
+  order: { name: string; wish: string };
+  feedback: { score: number; tips: string[]; recipe: Recipe } | null;
+};
+export type Game = ChessGame | PairsGame | DrinksGame;

@@ -3,6 +3,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { initialState } from './simulation.mjs';
+import { normalizeMemories } from './memory.mjs';
 
 export function openStore(directory) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -39,8 +40,10 @@ export function openStore(directory) {
     return Buffer.concat([decipher.update(data.subarray(28)), decipher.final()]).toString('utf8');
   }
   const saved = get('settings', { baseUrl: '', model: '', apiKey: '' });
+  const state = get('state', initialState());
+  normalizeMemories(state);
   return {
-    state: get('state', initialState()),
+    state,
     settings: { ...saved, apiKey: decrypt(saved.apiKey) },
     saveState(state) {
       put('state', state);

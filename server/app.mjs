@@ -3,7 +3,10 @@ import { z } from 'zod';
 import { openStore } from './store.mjs';
 import { advance, publicState, startActivity, message, localReply, travel } from './simulation.mjs';
 import { PLACES } from '../shared/places.mjs';
-import { complete, echoPrompt } from './provider.mjs';
+import { complete, echoPrompt, streamComplete } from './provider.mjs';
+import { addMemory, changeMemory, learnFromChat, relevantMemories } from './memory.mjs';
+import { startGame, gameAction } from './games.mjs';
+import { interact } from './companion.mjs';
 import { accessibleTarget, walkPath, ACTIVITIES } from '../shared/world.mjs';
 import { allowedHost, localHostnames } from './network.mjs';
 import { createLanAccess, isLoopback } from './access.mjs';
@@ -16,6 +19,7 @@ const configSchema = z.object({
   model: z.string().trim().max(150),
   apiKey: z.string().max(1000).optional(),
   clearKey: z.boolean().optional(),
+  streaming: z.boolean().optional(),
   playerName: z.string().trim().min(1).max(24).optional(),
 });
 export function createApplication(dataDirectory) {
@@ -70,7 +74,7 @@ export function createApplication(dataDirectory) {
     res.json({ ok: true });
   });
   const configured = () => Boolean(store.settings.baseUrl && store.settings.model);
-  const snapshot = () => publicState(s, configured());
+  const snapshot = () => ({ ...publicState(s, configured()), chatBusy });
   const save = () => {
     store.saveState(s);
     return snapshot();
@@ -81,6 +85,7 @@ export function createApplication(dataDirectory) {
     hasKey: Boolean(store.settings.apiKey),
     playerName: s.playerName,
     configured: configured(),
+    streaming: store.settings.streaming !== false,
     canPair: isLoopback(req.socket.remoteAddress),
   });
   app.get('/api/state', (req, res) => {
@@ -115,6 +120,7 @@ export function createApplication(dataDirectory) {
     store.settings = {
       baseUrl: input.baseUrl,
       model: input.model,
+      streaming: input.streaming ?? store.settings.streaming ?? true,
       apiKey: input.clearKey
         ? ''
         : input.apiKey?.trim() || (changedEndpoint ? '' : store.settings.apiKey),
@@ -151,6 +157,8 @@ export function createApplication(dataDirectory) {
   });
   app.post('/api/travel', (req, res) => {
     const { location } = z.object({ location: z.enum(Object.keys(PLACES)) }).parse(req.body);
+    if (s.game?.status === 'playing')
+      return res.status(409).json({ error: '先结束这一局，再一起出门吧。' });
     travel(s, location);
     res.json(save());
   });
@@ -169,6 +177,8 @@ export function createApplication(dataDirectory) {
         position: z.tuple([z.number().min(-5.75).max(5.75), z.number().min(-3.75).max(3.75)]),
       })
       .parse(req.body);
+    if (s.game?.status === 'playing')
+      return res.status(409).json({ error: 'Echo 还在游戏桌等你。' });
     if (s.activity?.together)
       return res.status(409).json({ error: '先结束当前共同活动，再去其他地方吧。' });
     if (
@@ -179,24 +189,201 @@ export function createApplication(dataDirectory) {
     s.playerPosition = position;
     res.json(save());
   });
-  app.post('/api/chat', async (req, res) => {
-    const { text } = z.object({ text: z.string().trim().min(1).max(1500) }).parse(req.body);
-    if (chatBusy) return res.status(409).json({ error: 'Echo 正在回复上一句话。' });
-    chatBusy = true;
+  app.post('/api/memory', (req, res) => {
+    if (chatBusy) return res.status(409).json({ error: '等 Echo 回复完，再修改这段记忆吧。' });
+    const input = z
+      .object({
+        operation: z.enum(['add', 'edit', 'pin', 'forget', 'save-message']),
+        id: z.string().max(100).optional(),
+        title: z.string().trim().min(1).max(60).optional(),
+        text: z.string().trim().min(1).max(1000).optional(),
+        kind: z.enum(['profile', 'preference', 'boundary', 'promise', 'moment']).optional(),
+      })
+      .parse(req.body);
     try {
-      let reply;
-      if (configured())
-        reply = await complete({ ...store.settings }, [
-          { role: 'system', content: echoPrompt(s) },
-          ...s.messages.slice(-20).map(({ role, content }) => ({ role, content })),
-          { role: 'user', content: text },
-        ]);
-      const offlineReply = localReply(s, text);
-      message(s, 'user', text, 'chat');
-      message(s, 'assistant', reply || offlineReply, reply ? 'model' : 'local');
+      if (input.operation === 'add') {
+        if (!input.text) return res.status(400).json({ error: '写下一件想记住的事吧。' });
+        addMemory(s, {
+          title: input.title || '想记住的事',
+          text: input.text,
+          kind: input.kind || 'moment',
+        });
+      } else if (input.operation === 'save-message') {
+        const m = s.messages.find((m) => m.id === input.id);
+        if (!m) return res.status(404).json({ error: '没有找到这句话。' });
+        addMemory(s, {
+          title: '想留住的一句话',
+          text: `${m.role === 'user' ? s.playerName : 'Echo'}说：“${m.content.slice(0, 900)}”`,
+          kind: 'moment',
+          source: 'chat',
+          messageId: m.id,
+        });
+      } else {
+        if (input.operation === 'edit' && !input.text)
+          return res.status(400).json({ error: '记忆内容不能为空。' });
+        changeMemory(s, input);
+      }
       res.json(save());
     } catch (error) {
-      res.status(502).json({ error: error.message });
+      res.status(404).json({ error: error.message });
+    }
+  });
+  app.post('/api/interaction', (req, res) => {
+    const input = z
+      .object({
+        kind: z.enum(['hand', 'hug', 'listen', 'praise', 'answer']),
+        choice: z.string().max(100).optional(),
+      })
+      .parse(req.body);
+    try {
+      interact(s, input.kind, input.choice);
+      res.json(save());
+    } catch (error) {
+      res.status(409).json({ error: error.message });
+    }
+  });
+  app.post('/api/game/start', (req, res) => {
+    const { kind, difficulty } = z
+      .object({
+        kind: z.enum(['chess', 'pairs', 'drinks']),
+        difficulty: z.enum(['gentle', 'thoughtful']).default('gentle'),
+      })
+      .parse(req.body);
+    try {
+      startGame(s, kind, difficulty);
+      res.json(save());
+    } catch (error) {
+      res.status(409).json({ error: error.message });
+    }
+  });
+  app.post('/api/game/action', (req, res) => {
+    const input = z
+      .object({
+        id: z.string().max(100),
+        revision: z.number().int().min(0),
+        action: z.enum(['move', 'resign', 'end', 'flip', 'continue', 'serve', 'next']),
+        from: z
+          .string()
+          .regex(/^[a-h][1-8]$/)
+          .optional(),
+        to: z
+          .string()
+          .regex(/^[a-h][1-8]$/)
+          .optional(),
+        promotion: z.enum(['q', 'r', 'b', 'n']).optional(),
+        index: z.number().int().min(0).max(15).optional(),
+        recipe: z
+          .object({
+            base: z.enum(['jasmine', 'matcha', 'black']),
+            sweetness: z.number().int().min(0).max(100),
+            ice: z.number().int().min(0).max(100),
+            strength: z.number().int().min(0).max(100),
+          })
+          .optional(),
+      })
+      .parse(req.body);
+    try {
+      gameAction(s, input);
+      res.json(save());
+    } catch (error) {
+      res.status(409).json({ error: error.message });
+    }
+  });
+  app.post('/api/chat', async (req, res) => {
+    const { text, requestId, replyToId, stream } = z
+      .object({
+        text: z.string().trim().min(1).max(1500),
+        requestId: z.string().uuid().optional(),
+        replyToId: z.string().max(100).optional(),
+        stream: z.boolean().default(false),
+      })
+      .parse(req.body);
+    const receipt = requestId && s.chatRequests.find((r) => r.id === requestId);
+    if (receipt) {
+      if (receipt.text !== text || receipt.replyToId !== replyToId)
+        return res.status(409).json({ error: '这次发送的内容已经改变，请重新发送。' });
+      return res.json(snapshot());
+    }
+    if (chatBusy) return res.status(409).json({ error: 'Echo 正在回复上一句话。' });
+    const quoted = replyToId ? s.messages.find((m) => m.id === replyToId) : null;
+    if (replyToId && !quoted)
+      return res.status(400).json({ error: '引用的消息已不在当前记录中。' });
+    chatBusy = true;
+    const controller = new AbortController();
+    res.on('close', () => {
+      if (!res.writableEnded) controller.abort();
+    });
+    const emit = (event) => {
+      if (!res.destroyed) res.write(`${JSON.stringify(event)}\n`);
+    };
+    try {
+      // Stage facts on a snapshot so failed generations cannot partially update the save.
+      const context = structuredClone(s);
+      learnFromChat(context, text);
+      const messages = [
+        { role: 'system', content: echoPrompt(context, text) },
+        ...context.messages
+          .filter((m) => !m.memoryExcluded)
+          .slice(-40)
+          .map(({ role, content }) => ({ role, content })),
+        ...(quoted ? [{ role: 'user', content: `本次回复引用的对话内容：${quoted.content}` }] : []),
+        { role: 'user', content: text },
+      ];
+      if (stream) {
+        res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+        res.flushHeaders();
+      }
+      let reply;
+      const usingModel = configured();
+      if (usingModel)
+        reply =
+          stream && store.settings.streaming !== false
+            ? await streamComplete(
+                { ...store.settings },
+                messages,
+                (text) => emit({ type: 'delta', text }),
+                controller.signal,
+              )
+            : await complete({ ...store.settings }, messages, 900);
+      if (controller.signal.aborted) return;
+      const userMessage = message(s, 'user', text, 'chat');
+      if (quoted)
+        userMessage.replyTo = {
+          id: quoted.id,
+          content: quoted.content.slice(0, 300),
+          role: quoted.role,
+        };
+      const committed = learnFromChat(s, text, userMessage.id);
+      const offlineReply = localReply(s, text, committed);
+      const answer = message(s, 'assistant', reply || offlineReply, usingModel ? 'model' : 'local');
+      answer.memoryIds = relevantMemories(s, text).map((m) => m.id);
+      if (s.companion?.pending) {
+        const pending = s.companion.pending;
+        addMemory(s, {
+          title: pending.label,
+          text: `${pending.label}时，你说：“${text.slice(0, 300)}”。`,
+          kind: 'moment',
+          source: 'interaction',
+          messageId: userMessage.id,
+        });
+        s.companion.pending = null;
+        s.companion.lastLine = answer.content;
+      }
+      if (stream && (!usingModel || store.settings.streaming === false))
+        emit({ type: 'delta', text: answer.content });
+      if (requestId)
+        s.chatRequests = [...s.chatRequests, { id: requestId, text, replyToId }].slice(-200);
+      chatBusy = false;
+      const state = save();
+      if (stream) {
+        emit({ type: 'done', state });
+        res.end();
+      } else res.json(state);
+    } catch (error) {
+      if (stream && res.headersSent) {
+        emit({ type: 'error', error: error.message });
+        res.end();
+      } else if (!res.destroyed) res.status(502).json({ error: error.message });
     } finally {
       chatBusy = false;
     }
