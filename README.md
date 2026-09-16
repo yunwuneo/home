@@ -148,7 +148,7 @@ scripts/              浏览器验收
 | `POST /api/session`         | `{ code }`，配对局域网设备                                                         |
 | `POST /api/session/logout`  | 撤销当前设备会话                                                                   |
 
-服务端已独立于 Web 渲染，为后续 iOS 客户端保留相同的领域逻辑和接口。iOS 应用本身尚未实现；后续可先评估 Capacitor 封装，再按性能需要接入原生渲染。公网访问需要补充认证、HTTPS、会话管理、限流与合适的密钥存储。
+原生 iOS 客户端已在 `ios/` 实现，使用 SwiftUI、SceneKit 和 Liquid Glass，通过上述 API 同步世界、对话、回忆和游戏进度。用 Xcode 26+ 打开 `ios/EchoHome.xcodeproj`，详见 [iOS 运行与验收说明](ios/README.md)。公网访问仍需要补充 HTTPS、多用户认证与部署方案。
 
 ## 后续迭代方向
 

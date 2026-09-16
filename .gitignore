@@ -5,3 +5,8 @@ data/
 .env*
 artifacts/
 *.log
+
+.DS_Store
+ios/**/xcuserdata/
+*.xcresult/
+DerivedData/

@@ -1,0 +1,47 @@
+name: EchoHome
+options:
+  bundleIdPrefix: com.echohome
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    SWIFT_VERSION: '6.0'
+    DEVELOPMENT_TEAM: ''
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    TARGETED_DEVICE_FAMILY: '1,2'
+targets:
+  EchoHome:
+    type: application
+    platform: iOS
+    sources: [EchoHome]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.echohome.native
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: EchoHome/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: '和 Echo 的家'
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: 'UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight'
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: 'UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight'
+  EchoHomeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [EchoHomeUITests]
+    dependencies:
+      - target: EchoHome
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.echohome.native.uitests
+schemes:
+  EchoHome:
+    build:
+      targets:
+        EchoHome: all
+        EchoHomeUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets: [EchoHomeUITests]
