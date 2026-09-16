@@ -3,7 +3,10 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { ContactShadows, Grid, Html, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { walkPath } from '../shared/world.mjs';
-import type { ActivityKind, State } from './types';
+import type { ActivityKind, PlaceId, State } from './types';
+import Places from './Places';
+import { CAMERA_VIEWS } from './cameraViews';
+import { PLACES } from '../shared/places.mjs';
 import {
   ActivityDetails,
   activityFraction,
@@ -332,6 +335,7 @@ function Arm({
 }
 
 function Character({
+  location,
   echo,
   position,
   speed,
@@ -339,6 +343,7 @@ function Character({
   mood,
   onClick,
 }: {
+  location: PlaceId;
   echo: boolean;
   position: [number, number];
   speed: number;
@@ -365,7 +370,7 @@ function Character({
   const seated =
     participates &&
     activity?.stage === 'doing' &&
-    ['tv', 'tea', 'eat', 'read'].includes(activity.kind);
+    ['tv', 'tea', 'eat', 'read', 'movie', 'coffee', 'work'].includes(activity.kind);
   const resting = participates && activity?.stage === 'doing' && activity.kind === 'rest';
   const sleeping = echo && resting && !walking;
   const happy = /开心|暖/.test(mood);
@@ -375,6 +380,11 @@ function Character({
   const pouring = kind === 'tea' && echo && fraction < 0.38;
   const preparing = kind === 'cook' && echo && fraction < 0.48;
   const labels = {
+    shop: '挑选新鲜食材',
+    movie: '观看星光短片',
+    work: '整理项目方案',
+    coffee: '咖啡与甜点',
+    stroll: '沿着河岸走走',
     cook:
       fraction < 0.48
         ? echo
@@ -394,17 +404,30 @@ function Character({
     wash: echo ? (fraction < 0.3 ? '冲洗抹布' : '擦拭洗漱台') : '叠好毛巾',
   };
   useEffect(() => {
-    path.current = walkPath([current.current.x, current.current.z], position).slice(1);
-  }, [position[0], position[1]]);
+    path.current = walkPath([current.current.x, current.current.z], position, location).slice(1);
+  }, [position[0], position[1], location, activity?.kind]);
   useFrame((_, dt) => {
     phase.current += Math.min(dt, 0.1) * speed;
+    if (
+      activity?.kind === 'stroll' &&
+      activity.stage === 'doing' &&
+      participates &&
+      !path.current.length
+    ) {
+      const z = current.current.z < 0 ? 2.5 : -1.5;
+      path.current = walkPath(
+        [current.current.x, current.current.z],
+        [echo ? 0.75 : 1.75, z],
+        location,
+      ).slice(1);
+    }
     const next = path.current[0];
     const moving = !!next;
     if (moving !== walking) setWalking(moving);
     if (next && speed) {
       const destination = new THREE.Vector3(next[0], 0, next[1]),
         distance = current.current.distanceTo(destination),
-        step = Math.min(dt, 0.06) * 2.5 * speed;
+        step = Math.min(dt, 0.06) * (activity?.kind === 'stroll' ? 0.7 : 2.5) * speed;
       if (distance < step) {
         current.current.copy(destination);
         path.current.shift();
@@ -418,25 +441,31 @@ function Character({
         root.current.rotation.y,
         resting
           ? 0
-          : activity?.kind === 'cook' && participates
+          : ['movie', 'work'].includes(activity?.kind || '') && participates
             ? Math.PI
-            : activity?.kind === 'eat' && participates
+            : activity?.kind === 'coffee' && participates
               ? echo
                 ? Math.PI / 2
                 : -Math.PI / 2
-              : activity?.kind === 'wash' && participates
-                ? echo
-                  ? Math.PI / 2
-                  : Math.PI
-                : activity?.kind === 'water' && participates
+              : activity?.kind === 'cook' && participates
+                ? Math.PI
+                : activity?.kind === 'eat' && participates
                   ? echo
-                    ? -0.9
-                    : -2.03
-                  : activity?.kind === 'read' && participates
+                    ? Math.PI / 2
+                    : -Math.PI / 2
+                  : activity?.kind === 'wash' && participates
                     ? echo
-                      ? 0.3
-                      : -0.3
-                    : 0,
+                      ? Math.PI / 2
+                      : Math.PI
+                    : activity?.kind === 'water' && participates
+                      ? echo
+                        ? -0.9
+                        : -2.03
+                      : activity?.kind === 'read' && participates
+                        ? echo
+                          ? 0.3
+                          : -0.3
+                        : 0,
         5,
         speed ? dt : 10,
       );
@@ -476,6 +505,7 @@ function Character({
           nod = 0.08 * (1 - bite);
           break;
         }
+        case 'coffee':
         case 'tea': {
           const sip = THREE.MathUtils.smoothstep(Math.sin(t * 1.6), 0, 0.8);
           left.splice(0, 3, -0.15, pouring ? 0.8 : 1.07 + sip * 0.15, 0.36);
@@ -507,6 +537,16 @@ function Character({
           );
           nod = 0.18;
           break;
+        case 'work':
+          left.splice(0, 3, -0.2, 0.95 + Math.sin(t * 9) * 0.025, 0.4);
+          right.splice(0, 3, 0.2, 0.95 + Math.cos(t * 9) * 0.025, 0.4);
+          nod = 0.1;
+          break;
+        case 'shop':
+          left.splice(0, 3, -0.3, 0.55, 0.15);
+          right.splice(0, 3, 0.25, 0.95 + Math.sin(t * 2) * 0.12, 0.45);
+          nod = 0.12;
+          break;
         case 'wash':
           left.splice(0, 3, -0.15, echo ? 1.4 : 1.13, 0.34);
           right.splice(
@@ -518,6 +558,7 @@ function Character({
           );
           nod = 0.14;
           break;
+        case 'movie':
         case 'tv':
           left.splice(0, 3, -0.22, 0.79, 0.3);
           right.splice(0, 3, 0.22, 0.82 + Math.max(0, Math.sin(t * 0.9)) * 0.17, 0.36);
@@ -540,18 +581,20 @@ function Character({
       : sitting
         ? kind === 'read' || kind === 'rest'
           ? -0.17
-          : kind === 'eat'
+          : ['eat', 'coffee', 'movie', 'work'].includes(kind!)
             ? 0.06
             : 0.24
         : 0;
     pose.current.position.x = sleeping ? 1.64 : 0;
     pose.current.position.z = sleeping
       ? 0.55
-      : sitting && ['tea', 'tv'].includes(kind!)
-        ? pouring
-          ? -0.08
-          : -0.56
-        : 0;
+      : sitting && kind === 'movie'
+        ? 0.7
+        : sitting && ['tea', 'tv'].includes(kind!)
+          ? pouring
+            ? -0.08
+            : -0.56
+          : 0;
     pose.current.rotation.x = sleeping ? -Math.PI / 2 : 0;
   });
   const hair = echo ? '#65504b' : '#434845',
@@ -642,13 +685,19 @@ function Character({
                 ))}
               </>
             )}
-            {kind === 'tv' && <Bowl p={[0.06, 0, 0.04]} c="#e7c995" />}
+            {(kind === 'tv' || kind === 'movie') && <Bowl p={[0.06, 0, 0.04]} c="#e7c995" />}
+            {kind === 'shop' && (
+              <>
+                <Box p={[0, -0.15, 0.05]} s={[0.4, 0.28, 0.3]} c="#7ba89b" />
+                <Box p={[0, 0.08, 0.05]} s={[0.38, 0.035, 0.035]} c="#466b63" />
+              </>
+            )}
             {kind === 'wash' && !echo && (
               <Box p={[0.06, 0.04, 0.05]} s={[0.28, 0.06, 0.25]} c="#bad4d1" />
             )}
           </Arm>
           <Arm side={1} target={handR} sleeve={echo ? '#f4ead3' : '#6c9e91'}>
-            {kind === 'tea' &&
+            {(kind === 'tea' || kind === 'coffee') &&
               (pouring ? (
                 <>
                   <Teapot />
@@ -782,7 +831,17 @@ function Character({
       >
         <div className={`world-name ${echo ? 'echo' : 'player'}`}>
           {echo ? 'Echo' : '你'}
-          <span>{walking ? '走动中' : kind ? labels[kind] : echo ? mood : '在家'}</span>
+          <span>
+            {walking
+              ? '走动中'
+              : kind
+                ? labels[kind]
+                : echo
+                  ? mood
+                  : location === 'home'
+                    ? '在家'
+                    : PLACES[location].district}
+          </span>
         </div>
       </Html>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.076, 0]}>
@@ -803,22 +862,66 @@ function AnimationClock({ running }: { running: boolean }) {
   }, [running, invalidate]);
   return null;
 }
-function CameraRig({ reset, zoom }: { reset: number; zoom: number }) {
-  const { camera, size, invalidate } = useThree();
+function CameraRig({
+  reset,
+  zoom,
+  focus,
+  location,
+}: {
+  reset: number;
+  zoom: number;
+  focus: ActivityKind | null;
+  location: PlaceId;
+}) {
+  const { camera, size, invalidate, gl } = useThree();
   const controls = useRef<any>(null);
-  useEffect(() => {
-    const cam = camera as THREE.OrthographicCamera;
-    cam.zoom = Math.min(size.width / 18.8, size.height / 13.4) * zoom;
-    cam.updateProjectionMatrix();
-    invalidate();
-  }, [camera, size, zoom, invalidate]);
-  useEffect(() => {
-    camera.position.set(12, 13, 16);
-    controls.current?.target.set(0, 0, 0);
-    controls.current?.update();
-    invalidate();
-  }, [reset, camera, invalidate]);
+  const motion = useRef<{
+    from: THREE.Vector3;
+    to: THREE.Vector3;
+    targetFrom: THREE.Vector3;
+    targetTo: THREE.Vector3;
+    zoomFrom: number;
+    zoomTo: number;
+    startedAt: number;
+  } | null>(null);
   const baseZoom = Math.min(size.width / 18.8, size.height / 13.4);
+  useEffect(() => {
+    const view = focus ? CAMERA_VIEWS[focus] : null;
+    const targetTo = new THREE.Vector3(
+      ...(view?.target || ([0, 0, 0] as [number, number, number])),
+    );
+    const to = view
+      ? targetTo.clone().add(new THREE.Vector3(...view.offset))
+      : new THREE.Vector3(12, 13, 16);
+    motion.current = {
+      from: camera.position.clone(),
+      to,
+      targetFrom: controls.current?.target.clone() || new THREE.Vector3(),
+      targetTo,
+      zoomFrom: camera.zoom,
+      zoomTo: baseZoom * zoom * (focus ? 2.45 : 1),
+      startedAt: performance.now(),
+    };
+    gl.domElement.dataset.cameraMoving = 'true';
+    invalidate();
+  }, [reset, camera, baseZoom, zoom, focus, location, invalidate, gl]);
+  useFrame(() => {
+    const m = motion.current;
+    if (!m || !controls.current) return;
+    const fraction = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 1
+      : Math.min(1, (performance.now() - m.startedAt) / 1050);
+    const eased = fraction * fraction * (3 - 2 * fraction);
+    camera.position.lerpVectors(m.from, m.to, eased);
+    controls.current.target.lerpVectors(m.targetFrom, m.targetTo, eased);
+    camera.zoom = THREE.MathUtils.lerp(m.zoomFrom, m.zoomTo, eased);
+    camera.updateProjectionMatrix();
+    controls.current.update();
+    if (fraction === 1) {
+      motion.current = null;
+      gl.domElement.dataset.cameraMoving = 'false';
+    } else invalidate();
+  });
   return (
     <OrbitControls
       ref={controls}
@@ -826,17 +929,21 @@ function CameraRig({ reset, zoom }: { reset: number; zoom: number }) {
       enableDamping={false}
       enablePan={false}
       enableZoom
+      onStart={() => {
+        motion.current = null;
+        gl.domElement.dataset.cameraMoving = 'false';
+      }}
       minZoom={baseZoom * 0.65}
-      maxZoom={baseZoom * 1.75}
+      maxZoom={baseZoom * 4.5}
       minPolarAngle={0.3}
       maxPolarAngle={1.25}
       minAzimuthAngle={-Math.PI * 0.38}
       maxAzimuthAngle={Math.PI * 0.48}
-      target={[0, 0, 0]}
     />
   );
 }
 function Scene({
+  focus,
   state,
   onSelect,
   onMove,
@@ -844,6 +951,7 @@ function Scene({
   reset,
   zoom,
 }: {
+  focus: ActivityKind | null;
   state: State;
   onSelect: (k: ActivityKind) => void;
   onMove: (p: [number, number]) => void;
@@ -852,9 +960,13 @@ function Scene({
   zoom: number;
 }) {
   const night = state.minute < 360 || state.minute > 1140;
+  const location = state.location || 'home';
   return (
     <>
-      <color attach="background" args={[night ? '#d1dcda' : '#edf3ef']} />
+      <color
+        attach="background"
+        args={[location === 'cinema' ? '#dce0eb' : night ? '#d1dcda' : '#edf3ef']}
+      />
       <ambientLight intensity={night ? 0.9 : 1.3} />
       <hemisphereLight args={['#fff6e1', '#aec8bb', 1.2]} />
       <directionalLight
@@ -868,8 +980,14 @@ function Scene({
         shadow-camera-bottom={-10}
         shadow-normalBias={0.035}
       />
-      <House onSelect={onSelect} night={night} tv={state.activity?.kind === 'tv'} />
-      <ActivityDetails state={state} />
+      {location === 'home' ? (
+        <>
+          <House onSelect={onSelect} night={night} tv={state.activity?.kind === 'tv'} />
+          <ActivityDetails state={state} />
+        </>
+      ) : (
+        <Places location={location} state={state} onSelect={onSelect} />
+      )}
       <mesh
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0.07, 0]}
@@ -884,6 +1002,8 @@ function Scene({
         <meshBasicMaterial side={THREE.DoubleSide} transparent opacity={0} depthWrite={false} />
       </mesh>
       <Character
+        key={`${location}-echo`}
+        location={location}
         echo
         position={state.echoPosition}
         speed={state.speed}
@@ -892,6 +1012,8 @@ function Scene({
         onClick={onEcho}
       />
       <Character
+        key={`${location}-player`}
+        location={location}
         echo={false}
         position={state.playerPosition}
         speed={state.speed}
@@ -900,6 +1022,7 @@ function Scene({
         onClick={onEcho}
       />
       <ContactShadows
+        key={location}
         position={[0, -0.535, 0]}
         opacity={0.35}
         scale={25}
@@ -920,7 +1043,7 @@ function Scene({
         fadeDistance={32}
         infiniteGrid
       />
-      <CameraRig reset={reset} zoom={zoom} />
+      <CameraRig reset={reset} zoom={zoom} focus={focus} location={location} />
       <AnimationClock running={state.speed > 0} />
     </>
   );
@@ -928,7 +1051,12 @@ function Scene({
 export default function World(props: Parameters<typeof Scene>[0]) {
   const [error, setError] = useState(false);
   return (
-    <div className="world" aria-label="3D 日式小家">
+    <div
+      className="world"
+      aria-label={`3D ${PLACES[props.state.location || 'home'].name}`}
+      data-location={props.state.location || 'home'}
+      data-focus={props.focus || 'overview'}
+    >
       {error ? (
         <div className="world-error">3D 场景无法启动，请开启浏览器硬件加速后刷新。</div>
       ) : (

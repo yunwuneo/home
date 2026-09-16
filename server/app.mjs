@@ -1,7 +1,8 @@
 import express from 'express';
 import { z } from 'zod';
 import { openStore } from './store.mjs';
-import { advance, publicState, startActivity, message, localReply } from './simulation.mjs';
+import { advance, publicState, startActivity, message, localReply, travel } from './simulation.mjs';
+import { PLACES } from '../shared/places.mjs';
 import { complete, echoPrompt } from './provider.mjs';
 import { accessibleTarget, walkPath, ACTIVITIES } from '../shared/world.mjs';
 import { allowedHost, localHostnames } from './network.mjs';
@@ -148,6 +149,11 @@ export function createApplication(dataDirectory) {
       res.status(409).json({ error: error.message });
     }
   });
+  app.post('/api/travel', (req, res) => {
+    const { location } = z.object({ location: z.enum(Object.keys(PLACES)) }).parse(req.body);
+    travel(s, location);
+    res.json(save());
+  });
   app.post('/api/activity/cancel', (req, res) => {
     if (s.activity) {
       s.activity = null;
@@ -165,7 +171,10 @@ export function createApplication(dataDirectory) {
       .parse(req.body);
     if (s.activity?.together)
       return res.status(409).json({ error: '先结束当前共同活动，再去其他地方吧。' });
-    if (!accessibleTarget(position) || !walkPath(s.playerPosition, position).length)
+    if (
+      !accessibleTarget(position, s.location) ||
+      !walkPath(s.playerPosition, position, s.location).length
+    )
       return res.status(400).json({ error: '那里放着家具，换一处空地吧。' });
     s.playerPosition = position;
     res.json(save());

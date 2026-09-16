@@ -12,6 +12,376 @@
   --pink: #d69c91;
   --paper: #fbfcf8;
 }
+.place-controls {
+  position: absolute;
+  top: 100px;
+  right: 26px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 9px;
+}
+.place-map-button,
+.back-overview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 37px;
+  padding: 8px 12px;
+  border: 1px solid #d2dedc;
+  border-radius: 6px;
+  background: #fafdf9ed;
+  color: #456d67;
+  font-size: 12px;
+}
+.back-overview {
+  background: #456d67;
+  color: white;
+  border-color: #456d67;
+}
+.close-view .room-labels {
+  display: none;
+}
+.close-activity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: 5px;
+  background: #fbfcf8ed;
+  color: #6a7f76;
+  font-size: 11px;
+}
+.close-view .day-label {
+  text-shadow: 0 1px 4px #ffffff;
+}
+.close-view .echo-status {
+  opacity: 0;
+  pointer-events: none;
+}
+.close-view .world-name {
+  font-size: 12px;
+}
+.journey-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  background: #e9efee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+  color: #496f6c;
+  animation: journey-in 0.4s ease both;
+}
+.journey-overlay span {
+  font-size: 19px;
+}
+.journey-overlay small {
+  font-size: 12px;
+  color: #809794;
+}
+.journey-overlay.arriving {
+  animation: journey-out 0.5s ease both;
+}
+@keyframes journey-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes journey-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+.city-dialog {
+  padding: 0;
+  border: 1px solid #d6e2df;
+  border-radius: 8px;
+  color: #3a5653;
+  background: #f8fbfa;
+  width: min(760px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  box-shadow: 0 24px 100px #243f4540;
+}
+.city-dialog::backdrop {
+  background: #29444b70;
+  backdrop-filter: blur(5px);
+}
+.city-header {
+  padding: 22px 26px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.city-header h2 {
+  font-size: 23px;
+  font-weight: 500;
+  margin-top: 7px;
+}
+.town-map {
+  position: relative;
+  height: 410px;
+  overflow: hidden;
+  background: #e6efe7;
+  isolation: isolate;
+}
+.map-river {
+  position: absolute;
+  width: 20%;
+  height: 150%;
+  top: -20%;
+  right: -9%;
+  transform: rotate(-16deg);
+  background: #9dccd9;
+  border-left: 9px solid #cbe4de;
+}
+.map-bank {
+  position: absolute;
+  inset: 54% 4% 4% 62%;
+  background: #c8dfc4;
+  border-radius: 45% 30% 20% 40%;
+  transform: rotate(-8deg);
+}
+.map-road {
+  position: absolute;
+  background: #fafbf7;
+  border: 1px solid #d3dfd5;
+}
+.map-road.horizontal {
+  left: -10%;
+  top: 44%;
+  height: 30px;
+  width: 110%;
+  transform: rotate(-5deg);
+}
+.map-road.vertical {
+  left: 35%;
+  top: -5%;
+  height: 115%;
+  width: 27px;
+  transform: rotate(11deg);
+}
+.map-road.riverside {
+  left: 62%;
+  top: -8%;
+  height: 116%;
+  width: 20px;
+  transform: rotate(-18deg);
+}
+.map-street {
+  position: absolute;
+  font-size: 10px;
+  color: #8b9e94;
+}
+.street-one {
+  left: 13%;
+  top: 48%;
+  transform: rotate(-5deg);
+}
+.street-two {
+  left: 37%;
+  top: 35%;
+  transform: rotate(-79deg);
+}
+.map-water-label {
+  position: absolute;
+  right: 2%;
+  top: 43%;
+  writing-mode: vertical-rl;
+  font-size: 11px;
+  color: #568c9e;
+}
+.map-north {
+  position: absolute;
+  top: 16px;
+  right: 19px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: #668c8c;
+}
+.map-tree {
+  position: absolute;
+  color: #a1c3a3;
+}
+.map-place {
+  position: absolute;
+  transform: translate(-50%, -35%);
+  width: 116px;
+  height: 111px;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 5px;
+}
+.map-building {
+  width: 57px;
+  height: 51px;
+  display: grid;
+  place-items: center;
+  background: var(--place-color);
+  color: #fff;
+  border: 3px solid #ffffffd9;
+  border-radius: 5px;
+  box-shadow: 5px 6px 0 #78938b22;
+  transition: transform 0.2s;
+}
+.building-office {
+  height: 59px;
+  margin-top: -8px;
+}
+.building-park {
+  border-radius: 45%;
+}
+.map-place.selected .map-building {
+  outline: 2px solid var(--place-color);
+  outline-offset: 4px;
+  transform: translateY(-3px);
+}
+.map-place strong {
+  font-size: 12px;
+  font-weight: 600;
+  background: #edf5e8ec;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.map-place small {
+  font-size: 10px;
+  color: #7c9485;
+}
+.map-place.current small {
+  color: #366d60;
+  font-weight: 600;
+}
+.map-destination {
+  padding: 23px 26px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-top: 1px solid #d9e4dd;
+}
+.map-destination > svg {
+  flex-shrink: 0;
+}
+.map-destination h3 {
+  font-size: 17px;
+  font-weight: 500;
+}
+.map-destination p {
+  font-size: 12px;
+  color: #879991;
+  margin-top: 6px;
+}
+.map-destination .primary {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+@media (max-width: 760px) {
+  .place-controls {
+    top: 165px;
+    left: 22px;
+    right: auto;
+    align-items: flex-start;
+  }
+  .place-map-button,
+  .back-overview {
+    font-size: 11px;
+    min-height: 33px;
+    padding: 6px 9px;
+  }
+  .city-header {
+    padding: 18px;
+  }
+  .city-header h2 {
+    font-size: 20px;
+  }
+  .town-map {
+    height: 390px;
+  }
+  .map-place {
+    width: 86px;
+    height: 101px;
+  }
+  .map-building {
+    width: 45px;
+    height: 43px;
+  }
+  .map-building svg {
+    width: 23px;
+  }
+  .building-office {
+    height: 51px;
+  }
+  .map-place strong {
+    font-size: 10px;
+    padding: 2px;
+  }
+  .map-place small {
+    font-size: 9px;
+  }
+  .map-destination {
+    padding: 17px;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+  .map-destination h3 {
+    font-size: 15px;
+  }
+  .map-destination p {
+    font-size: 10px;
+  }
+  .map-destination > svg {
+    width: 21px;
+  }
+  .map-destination .primary {
+    padding: 8px;
+    font-size: 11px;
+  }
+}
+@media (max-height: 650px) and (min-width: 761px) {
+  .place-controls {
+    top: 76px;
+    right: 18px;
+  }
+  .town-map {
+    height: 300px;
+  }
+}
+@media (max-height: 520px) and (orientation: landscape) {
+  .city-header {
+    padding: 12px 20px;
+  }
+  .city-header h2 {
+    font-size: 18px;
+  }
+  .city-header .eyebrow {
+    display: none;
+  }
+  .town-map {
+    height: 245px;
+  }
+  .map-place {
+    transform: translate(-50%, -42%) scale(0.8);
+  }
+  .map-destination {
+    padding: 12px 20px;
+  }
+}
 .pairing-page {
   min-height: 100dvh;
   display: flex;
@@ -2132,5 +2502,35 @@ fieldset {
   .spin,
   .typing > span {
     animation: none;
+  }
+  .journey-overlay {
+    animation: none;
+  }
+}
+@media (max-width: 760px) {
+  .close-view .furniture-popover {
+    left: 14px;
+    right: 64px;
+    bottom: 170px;
+    width: auto;
+    max-width: none;
+    transform: none;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 10px;
+  }
+  .close-view .furniture-popover .primary {
+    margin-left: 0;
+  }
+  .close-view .furniture-popover > div:nth-child(2) {
+    flex: 1;
+  }
+  .close-view .furniture-popover .icon-button {
+    position: absolute;
+    top: 5px;
+    right: 4px;
+  }
+  .close-view .furniture-popover h3 {
+    padding-right: 22px;
   }
 }

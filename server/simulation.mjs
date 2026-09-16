@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { ACTIVITIES } from '../shared/world.mjs';
+import { PLACES, OUTINGS } from '../shared/places.mjs';
 
 export function initialState() {
   return {
     version: 1,
+    location: 'home',
     day: 1,
     minute: 16 * 60 + 20,
     speed: 1,
@@ -54,6 +56,8 @@ export function remember(s, title, text, kind = 'daily') {
 export function startActivity(s, kind, together = true) {
   const a = ACTIVITIES[kind];
   if (!a) throw new Error('没有找到这项活动。');
+  if ((a.place || 'home') !== (s.location || 'home'))
+    throw new Error('先到对应的地点，再一起做这件事吧。');
   if (kind === 'eat' && s.meals < 1) throw new Error('还没有准备好的料理，先一起做饭吧。');
   if (s.activity?.together) throw new Error('我们还在一起活动，结束后再做这件事吧。');
   s.activity = { kind, together, progress: 0, duration: a.duration, stage: 'walking' };
@@ -68,6 +72,24 @@ export function startActivity(s, kind, together = true) {
       : `我想去${a.verb}。${kind === 'cook' ? '做好了叫你来吃。' : '你也可以过来陪我呀。'}`,
   );
   s.lastAuto = s.elapsed;
+}
+export function travel(s, location) {
+  if (!Object.hasOwn(PLACES, location)) throw new Error('没有找到这个地点。');
+  if ((s.location || 'home') === location) return;
+  const place = PLACES[location];
+  s.location = location;
+  s.activity = null;
+  s.echoPosition = [...place.echo];
+  s.playerPosition = [...place.player];
+  s.lastAuto = s.elapsed;
+  s.mood = location === 'home' ? '回家真好' : '和你一起出门';
+  message(
+    s,
+    'assistant',
+    location === 'home'
+      ? '到家啦。把外面的热闹留在门外，慢慢歇一会儿。'
+      : `到${place.name}啦。${place.subtitle}，想和你一起。`,
+  );
 }
 export function advance(s, seconds) {
   if (!s.speed) return false;
@@ -93,6 +115,12 @@ export function advance(s, seconds) {
       }
       if (kind === 'rest') s.energy = Math.min(100, s.energy + 45);
       if (kind === 'tea') s.energy = Math.min(100, s.energy + 8);
+      if (kind === 'shop') s.meals = Math.min(6, s.meals + 2);
+      if (kind === 'coffee') {
+        s.energy = Math.min(100, s.energy + 18);
+        s.hunger = Math.min(100, s.hunger + 12);
+      }
+      if (kind === 'stroll' || kind === 'movie') s.energy = Math.min(100, s.energy + 10);
       if (together) {
         const novel = !s.completed.includes(kind);
         s.warmth += novel ? 3 : 0.35;
@@ -108,13 +136,17 @@ export function advance(s, seconds) {
           read: '这句话先夹在书里，下次我们接着读。',
           wash: '收拾好啦！整整齐齐的，看着就心情好。',
         };
-        message(s, 'assistant', endings[kind]);
+        message(s, 'assistant', OUTINGS[kind]?.ending || endings[kind]);
       }
       s.mood = together ? '心里暖暖的' : '悠然自得';
       s.activity = null;
       s.lastAuto = s.elapsed;
     }
   } else if (s.elapsed - s.lastAuto > 42) {
+    if (s.location && s.location !== 'home') {
+      startActivity(s, PLACES[s.location].activities[0], false);
+      return true;
+    }
     const h = s.minute / 60;
     const alternate = Math.floor(s.elapsed / 42) % 2;
     const kind =
@@ -157,6 +189,7 @@ export function publicState(s, configured) {
   const { warmth, lastAuto, elapsed, ...rest } = s;
   return {
     ...rest,
+    location: s.location || 'home',
     configured,
     relationship: warmth < 6 ? '开始熟悉彼此' : warmth < 15 ? '慢慢靠近' : '心照不宣的陪伴',
   };
@@ -183,6 +216,10 @@ export function localReply(s, text) {
       ? '晚安。今天能见到你，我很开心。明天再一起吃早餐吧。'
       : '见到你就忍不住想笑。今天想怎么度过呢？';
   if (/名字|叫我/.test(text)) return `好呀，${s.playerName}。这样叫你的时候，好像又熟悉了一点。`;
+  if (s.location && s.location !== 'home')
+    return s.activity
+      ? `嗯，我在听。一起${ACTIVITIES[s.activity.kind].verb}的时候，也想听听你今天的心情。`
+      : `在${PLACES[s.location].name}和你待一会儿，感觉很好。要不要${ACTIVITIES[PLACES[s.location].activities[0]].verb}？`;
   if (/家|住/.test(text))
     return '我最喜欢窗边那一小块阳光。以后这里会慢慢留下我们一起生活的痕迹吧。';
   if (/做饭|吃|饿/.test(text))

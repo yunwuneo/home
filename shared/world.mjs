@@ -1,6 +1,8 @@
 import PF from 'pathfinding';
+import { OUTINGS, PLACE_OBSTACLES } from './places.mjs';
 
 export const ACTIVITIES = {
+  ...OUTINGS,
   cook: {
     label: '一起做饭',
     verb: '准备晚餐',
@@ -102,18 +104,19 @@ const STEP = 0.25,
   HEIGHT = 31;
 const cell = (p) => [Math.round((p[0] + 5.75) / STEP), Math.round((p[1] + 3.75) / STEP)];
 const point = (p) => [p[0] * STEP - 5.75, p[1] * STEP - 3.75];
-function grid() {
+function grid(place = 'home') {
+  const obstacles = place === 'home' ? OBSTACLES : PLACE_OBSTACLES[place] || [];
   const g = new PF.Grid(WIDTH, HEIGHT);
   for (let y = 0; y < HEIGHT; y++)
     for (let x = 0; x < WIDTH; x++) {
       const [wx, wz] = point([x, y]);
-      if (OBSTACLES.some(([x1, z1, x2, z2]) => wx >= x1 && wx <= x2 && wz >= z1 && wz <= z2))
+      if (obstacles.some(([x1, z1, x2, z2]) => wx >= x1 && wx <= x2 && wz >= z1 && wz <= z2))
         g.setWalkableAt(x, y, false);
     }
   return g;
 }
-export function walkPath(from, to) {
-  const g = grid(),
+export function walkPath(from, to, place = 'home') {
+  const g = grid(place),
     a = cell(from),
     b = cell(to);
   if (!g.isInside(...a) || !g.isInside(...b) || !g.isWalkableAt(...b)) return [];
@@ -122,8 +125,8 @@ export function walkPath(from, to) {
     .findPath(...a, ...b, g)
     .map(point);
 }
-export function accessibleTarget(p) {
-  const g = grid(),
+export function accessibleTarget(p, place = 'home') {
+  const g = grid(place),
     c = cell(p);
   return g.isInside(...c) && g.isWalkableAt(...c);
 }

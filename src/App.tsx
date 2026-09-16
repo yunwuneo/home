@@ -43,14 +43,28 @@ import {
   CloudSun,
   WifiOff,
   KeyRound,
+  Map,
+  ShoppingBasket,
+  Clapperboard,
+  Building2,
+  Trees,
+  Focus,
 } from 'lucide-react';
 import { api, ApiError } from './api';
 import LanLogin from './LanLogin';
-import type { ActivityKind, Settings, State, View } from './types';
+import type { ActivityKind, PlaceId, Settings, State, View } from './types';
 import { ACTIVITIES } from '../shared/world.mjs';
+import { PLACES } from '../shared/places.mjs';
+import { CAMERA_VIEWS } from './cameraViews';
+import CityMap from './CityMap';
 
 const World = lazy(() => import('./World'));
 const icons = {
+  shop: ShoppingBasket,
+  movie: Clapperboard,
+  work: Building2,
+  coffee: Coffee,
+  stroll: Trees,
   cook: CookingPot,
   eat: Utensils,
   tea: Coffee,
@@ -377,6 +391,13 @@ function SettingsDialog({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   );
 }
 export default function App() {
+  const [showMap, setShowMap] = useState(false);
+  const [focus, setFocus] = useState<ActivityKind | null>(null);
+  const [journey, setJourney] = useState<{
+    destination: PlaceId;
+    phase: 'leaving' | 'arriving';
+  } | null>(null);
+  const traveling = useRef(false);
   const [state, setState] = useState<State | null>(null),
     [error, setError] = useState(''),
     [connected, setConnected] = useState(true),
@@ -396,6 +417,53 @@ export default function App() {
     [autoScroll, setAutoScroll] = useState(true),
     [unread, setUnread] = useState(false);
   const closeSettings = useCallback(() => setShowSettings(false), []);
+  useEffect(() => {
+    setFocus(null);
+    setSelected(null);
+    setMore(false);
+    setZoom(1);
+  }, [state?.location]);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]') && !showSettings) {
+        setFocus(null);
+        setSelected(null);
+        setZoom(1);
+      }
+    };
+    window.addEventListener('keydown', escape);
+    return () => window.removeEventListener('keydown', escape);
+  }, [showSettings]);
+  function selectFurniture(kind: ActivityKind) {
+    setSelected(kind);
+    setFocus(kind);
+    setZoom(1);
+    setReset((r) => r + 1);
+  }
+  async function travelTo(destination: PlaceId) {
+    if (traveling.current || acting || sending || destination === (state?.location || 'home'))
+      return;
+    traveling.current = true;
+    setShowMap(false);
+    setSelected(null);
+    setMore(false);
+    setJourney({ destination, phase: 'leaving' });
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    await new Promise((resolve) => setTimeout(resolve, reduced ? 0 : 400));
+    if (!(await action('/travel', { location: destination }))) {
+      setJourney(null);
+      traveling.current = false;
+      return;
+    }
+    setFocus(null);
+    setZoom(1);
+    setReset((r) => r + 1);
+    await new Promise((resolve) => setTimeout(resolve, reduced ? 100 : 700));
+    setJourney({ destination, phase: 'arriving' });
+    await new Promise((resolve) => setTimeout(resolve, reduced ? 0 : 500));
+    setJourney(null);
+    traveling.current = false;
+  }
   const log = useRef<HTMLDivElement>(null),
     input = useRef<HTMLTextAreaElement>(null),
     chatForm = useRef<HTMLFormElement>(null),
@@ -440,14 +508,18 @@ export default function App() {
     try {
       setState(await api<State>(path, body));
       setConnected(true);
+      return true;
     } catch (e) {
       setError((e as Error).message);
+      return false;
     } finally {
       generation.current++;
       setActing(false);
     }
   }
   async function activity(kind: ActivityKind) {
+    setFocus(kind);
+    setZoom(1);
     setSelected(null);
     setMore(false);
     await action('/activity', { kind });
@@ -516,6 +588,11 @@ export default function App() {
       </div>
     );
   const current = state.activity ? ACTIVITIES[state.activity.kind] : null;
+  const locationId = state.location || 'home';
+  const place = PLACES[locationId];
+  const dockActivities = (
+    locationId === 'home' ? ['cook', 'eat', 'tv', 'rest'] : place.activities
+  ) as ActivityKind[];
   const remaining = state.activity
     ? Math.max(0, Math.ceil(state.activity.duration - state.activity.progress))
     : 0;
@@ -574,7 +651,7 @@ export default function App() {
         </div>
       </header>
       <main className="main-space">
-        <section className="home-space" aria-label="小家">
+        <section className={`home-space ${focus ? 'close-view' : ''}`} aria-label={place.name}>
           <SceneBoundary>
             <Suspense
               fallback={
@@ -586,20 +663,23 @@ export default function App() {
             >
               <World
                 state={state}
-                onSelect={setSelected}
+                onSelect={selectFurniture}
                 onMove={(p) => {
                   if (!acting) void action('/move', { position: p });
                 }}
                 onEcho={focusChat}
                 reset={reset}
                 zoom={zoom}
+                focus={focus}
               />
             </Suspense>
           </SceneBoundary>
           <div className="day-label">
-            <span className="eyebrow">HOME, SWEET HOME</span>
+            <span className="eyebrow">
+              {locationId === 'home' ? 'HOME, SWEET HOME' : place.district}
+            </span>
             <h2>
-              一起生活的第 {state.day} 天
+              {locationId === 'home' ? `一起生活的第 ${state.day} 天` : place.name}
               <span className="tiny-flower">
                 <Flower2 size={22} />
               </span>
@@ -608,7 +688,9 @@ export default function App() {
               {night ? <Moon size={14} /> : <Sun size={14} />}初秋 ·{' '}
               {night ? '静谧的夜晚' : '阳光正好'}
               <span className="dot-separator">·</span>
-              {current?.room || '客厅'}
+              {focus
+                ? CAMERA_VIEWS[focus].label
+                : current?.room || (locationId === 'home' ? '客厅' : place.subtitle)}
             </p>
           </div>
           <div className="time-control">
@@ -638,7 +720,7 @@ export default function App() {
               {state.speed === 3 ? '3×' : '1×'}
             </button>
           </div>
-          <aside className="echo-status">
+          <aside className="echo-status" inert={!!focus}>
             <div className="status-heading">
               <span className="flower-avatar">
                 <Flower2 size={21} />
@@ -705,17 +787,66 @@ export default function App() {
               <div className="idle-note">
                 <span className="small-label">此刻</span>
                 <p>
-                  在家里悠闲地待着
+                  {locationId === 'home' ? '在家里悠闲地待着' : `在${place.name}待一会儿`}
                   <Leaf size={14} />
                 </p>
               </div>
             )}
           </aside>
           <div className="room-labels">
-            <span>客厅 · 餐厨</span>
-            <span>卧室 · 浴室</span>
+            <span>{locationId === 'home' ? '客厅 · 餐厨' : place.district}</span>
+            <span>{locationId === 'home' ? '卧室 · 浴室' : '和 Echo 在一起'}</span>
+          </div>
+          <div className="place-controls">
+            <button
+              className="place-map-button"
+              onClick={() => setShowMap(true)}
+              disabled={acting || sending || !!journey}
+            >
+              <Map size={18} />
+              <span>生活地图</span>
+            </button>
+            {focus && (
+              <button
+                className="back-overview"
+                onClick={() => {
+                  setFocus(null);
+                  setSelected(null);
+                  setZoom(1);
+                }}
+              >
+                <ArrowLeft size={15} />
+                <span>返回全景</span>
+              </button>
+            )}
+            {focus && state.activity?.together && (
+              <button
+                className="close-activity"
+                disabled={acting}
+                onClick={() => void action('/activity/cancel', {})}
+              >
+                <X size={14} />
+                <span>结束这次活动</span>
+              </button>
+            )}
           </div>
           <div className="camera-controls">
+            <IconButton
+              label="近景镜头"
+              active={!!focus}
+              onClick={() => {
+                if (focus) {
+                  setFocus(null);
+                  setSelected(null);
+                  setZoom(1);
+                } else
+                  selectFurniture(
+                    state.activity?.kind || (locationId === 'home' ? 'eat' : dockActivities[0]),
+                  );
+              }}
+            >
+              <Focus size={17} />
+            </IconButton>
             <IconButton
               label="缩小视角"
               onClick={() => setZoom((z) => Math.max(0.65, z - 0.15))}
@@ -736,6 +867,8 @@ export default function App() {
               onClick={() => {
                 setReset((r) => r + 1);
                 setZoom(1);
+                setFocus(null);
+                setSelected(null);
               }}
             >
               <RotateCcw size={16} />
@@ -744,7 +877,7 @@ export default function App() {
               <Maximize2 size={16} />
             </IconButton>
           </div>
-          {selected && (
+          {selected && !state.activity?.together && (
             <div className="furniture-popover">
               <div className="furniture-icon">
                 {(() => {
@@ -775,7 +908,7 @@ export default function App() {
           )}
           <div className="activity-dock">
             <span className="dock-label">和她一起</span>
-            {(['cook', 'eat', 'tv', 'rest'] as ActivityKind[]).map((kind) => {
+            {dockActivities.map((kind) => {
               const Icon = icons[kind];
               return (
                 <button
@@ -793,27 +926,29 @@ export default function App() {
                 >
                   <Icon size={21} />
                   <span>
-                    {
-                      (
-                        { cook: '做饭', eat: '吃饭', tv: '看电视', rest: '休息' } as Record<
-                          string,
-                          string
-                        >
-                      )[kind]
-                    }
+                    {(
+                      { cook: '做饭', eat: '吃饭', tv: '看电视', rest: '休息' } as Record<
+                        string,
+                        string
+                      >
+                    )[kind] || ACTIVITIES[kind].label}
                   </span>
                 </button>
               );
             })}
-            <span className="dock-divider" />
-            <button
-              aria-label="更多活动"
-              onClick={() => setMore(!more)}
-              className={more ? 'selected' : ''}
-            >
-              <Plus size={21} />
-              <span>更多</span>
-            </button>
+            {locationId === 'home' && (
+              <>
+                <span className="dock-divider" />
+                <button
+                  aria-label="更多活动"
+                  onClick={() => setMore(!more)}
+                  className={more ? 'selected' : ''}
+                >
+                  <Plus size={21} />
+                  <span>更多</span>
+                </button>
+              </>
+            )}
             {more && (
               <div className="more-menu">
                 {(['tea', 'water', 'read', 'wash'] as ActivityKind[]).map((kind) => {
@@ -838,6 +973,17 @@ export default function App() {
             <span>和 Echo 聊聊</span>
             <span className="status-dot" />
           </button>
+          {journey && (
+            <div className={`journey-overlay ${journey.phase}`} role="status" aria-live="polite">
+              <Map size={30} />
+              <span>
+                {journey.phase === 'leaving'
+                  ? `正在前往${PLACES[journey.destination].name}`
+                  : `抵达${place.name}`}
+              </span>
+              <small>你 · Echo</small>
+            </div>
+          )}
         </section>
         {view !== 'home' && (
           <section className="page-overlay">
@@ -1010,7 +1156,7 @@ export default function App() {
             </button>
           </div>
           <div className="chat-date">
-            <span />第 {state.day} 天 · 我们的小家
+            <span />第 {state.day} 天 · {place.name}
             <span />
           </div>
           <div
@@ -1041,7 +1187,7 @@ export default function App() {
                   {m.source === 'life' && index > 0 && (
                     <span className="message-source">
                       <Leaf size={10} />
-                      家里的日常
+                      共同的日常
                     </span>
                   )}
                 </div>
@@ -1149,6 +1295,14 @@ export default function App() {
         </div>
       )}
       {showSettings && <SettingsDialog onClose={closeSettings} onSaved={() => void refresh()} />}
+      {showMap && (
+        <CityMap
+          current={locationId}
+          onClose={() => setShowMap(false)}
+          onTravel={(id) => void travelTo(id)}
+          busy={acting || sending || !!journey || !connected}
+        />
+      )}
     </div>
   );
 }

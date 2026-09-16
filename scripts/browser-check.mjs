@@ -131,7 +131,9 @@ try {
       bounds.y + ((1 - point.y) * bounds.height) / 2,
     );
   }
-  await wait(300);
+  await page.waitForFunction(
+    () => document.querySelector('canvas')?.dataset.cameraMoving === 'false',
+  );
   await clickWorld(1.35, 0.07, 2.5);
   await wait(500);
   const moved = await (await fetch(url + '/api/state')).json();
@@ -223,6 +225,28 @@ try {
       200,
       'paired device can access the world',
     );
+    // Exercise the real LAN backend: visual fixtures cannot detect a stale server.
+    await remote.getByRole('button', { name: '生活地图', exact: true }).click();
+    await remote.getByRole('button', { name: '青禾超市', exact: true }).click();
+    const travelResponse = remote.waitForResponse(
+      (response) =>
+        response.url() === remoteUrl + '/api/travel' && response.request().method() === 'POST',
+    );
+    await remote.getByRole('button', { name: '一起出发', exact: true }).click();
+    assert.equal(
+      (await travelResponse).status(),
+      200,
+      'paired phone can travel through the real API',
+    );
+    await remote.locator('.world[data-location="market"]').waitFor();
+    await remote.locator('.journey-overlay').waitFor({ state: 'detached' });
+    await remote.reload();
+    await remote.locator('.world[data-location="market"]').waitFor();
+    assert.equal(
+      (await (await remote.request.get(remoteUrl + '/api/state')).json()).location,
+      'market',
+    );
+    await remote.screenshot({ path: join(output, 'lan-market.png') });
     await remote.getByRole('button', { name: '设置', exact: true }).click();
     await remote.getByRole('button', { name: '断开此设备', exact: true }).click();
     await remote.getByRole('heading', { name: '配对这台设备', exact: true }).waitFor();
@@ -255,7 +279,9 @@ try {
           'portrait',
           'landscape',
           'wide desktop',
-          ...(lanAddress ? ['LAN pairing', 'LAN logout'] : []),
+          ...(lanAddress
+            ? ['LAN pairing', 'LAN map travel', 'LAN location reload', 'LAN logout']
+            : []),
         ],
       },
       null,

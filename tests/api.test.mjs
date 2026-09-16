@@ -136,6 +136,23 @@ test('API persists life, validates requests, protects secrets, and speaks to a c
     assert.equal((await call('/api/settings')).body.hasKey, false);
     await call('/api/settings', { baseUrl: '', model: '', clearKey: true });
     assert.equal((await call('/api/state')).body.configured, false);
+    assert.equal((await call('/api/travel', { location: 'invalid' })).status, 400);
+    data = await call('/api/travel', { location: 'market' });
+    assert.equal(data.body.location, 'market');
+    assert.equal((await call('/api/activity', { kind: 'cook' })).status, 409);
+    assert.equal((await call('/api/move', { position: [-3.5, 0] })).status, 400);
+    assert.equal((await call('/api/move', { position: [0, 1.5] })).status, 200);
+    assert.equal((await call('/api/activity', { kind: 'shop' })).status, 200);
+    data = await call('/api/travel', { location: 'cinema' });
+    assert.equal(data.body.activity, null);
+    assert.equal(data.body.meals, 2);
+    await new Promise((r) => server.close(r));
+    runtime.close();
+    runtime = createApplication(directory);
+    base = await listen();
+    data = await call('/api/state');
+    assert.equal(data.body.location, 'cinema');
+    assert.equal((await call('/api/activity', { kind: 'movie' })).status, 200);
   } finally {
     if (server?.listening) await new Promise((r) => server.close(r));
     if (provider?.listening) await new Promise((r) => provider.close(r));

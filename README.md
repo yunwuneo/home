@@ -11,6 +11,8 @@ pnpm install
 pnpm dev
 ```
 
+开发服务会监听 `server/` 和 `shared/` 的修改并自动重启，避免前端已经热更新、后端却仍使用旧接口；不会监听 Vite 自动生成的临时文件。修改后端时请使用 `pnpm dev`；直接运行 `node server/index.mjs` 的服务需要手动重启。手机应继续使用同一个局域网端口。目录监听适用于 Windows/macOS；Linux 开发可直接运行 `node server/index.mjs`，修改后端后手动重启。
+
 默认监听 `0.0.0.0:5173`，本机使用 `http://127.0.0.1:5173`，局域网设备使用终端输出的 LAN 地址。当前电脑的以太网地址为 `http://192.168.31.206:5173`；设备须在可互通的局域网中。如果端口已占用，服务端会尝试接下来的端口。当前开发机器也可以直接运行 `node server/index.mjs`，依赖已经安装。
 
 局域网设备第一次访问需要配对：在服务器电脑打开本机地址，进入设置，点击“生成配对码”，然后在手机上输入。配对码十分钟有效且只能使用一次；设备会话保留七天，重启服务不会丢失。手机设置中可以“断开此设备”。未配对的设备不能读取对话、存档、设置，也不能调用游戏操作接口。
@@ -28,7 +30,13 @@ pnpm test:browser
 
 启动本地服务后，`pnpm test:activities` 使用浏览器内的测试状态检查八项活动的前、中、后期动作、桌面和手机画面、单人活动、暂停与取消，截图保存在 `artifacts/activities/`。不会改动实际存档；可用 `ECHO_VISUAL_URL` 指定预览地址，也可以运行 `node scripts/activity-check.mjs cook tea` 仅复查指定活动。
 
+`pnpm test:city` 验证生活地图、家具近景、六处场景、出行过渡和失败恢复，以及桌面、手机横竖屏与减少动态效果偏好，截图保存在 `artifacts/city/`。通过拦截请求使用独立测试状态，不修改实际存档，也可用 `ECHO_VISUAL_URL` 指定地址。
+
 ## 已实现
+
+- 生活地图：在小家、青禾超市、星光电影院、晴川公司、转角咖啡馆和河畔公园之间出行，淡出后进入新场景。当前位置随存档保存，旧存档从小家继续。
+- 家具近景：点击餐桌、沙发、工位、货架等会平滑拉近；使用“返回全景”、重置镜头或 Escape 返回。近景仍可旋转和缩放，支持减少动态效果偏好。
+- 五种外出活动：买菜与便当补给、观看动态短片、办公协作、咖啡与甜点、河畔散步。每处都有独立的 3D 布景、寻路障碍和共同回忆。外出会结束未完成的活动，不结算未完成的奖励。
 
 - Three.js 3D 小家：客厅、餐厨、榻榻米卧室与浴室。家具和 Q 版人物都是项目内生成的模型，不依赖远程美术资源。
 - 两个可见角色，A* 网格寻路，行走、眨眼、坐下、躺下与部分手持物动作。
@@ -95,20 +103,21 @@ scripts/              浏览器验收
 
 ## 接口
 
-| 方法与路径                  | 用途                                 |
-| --------------------------- | ------------------------------------ |
-| `GET /api/state`            | 世界、活动、对话、回忆和公开关系状态 |
-| `GET /api/settings`         | 脱敏设置                             |
-| `POST /api/settings`        | 保存模型连接与称呼                   |
-| `POST /api/settings/test`   | 测试已保存的模型                     |
-| `POST /api/chat`            | `{ text }`，文字交流                 |
-| `POST /api/activity`        | `{ kind }`，开始共同活动             |
-| `POST /api/activity/cancel` | 结束当前活动                         |
-| `POST /api/move`            | `{ position: [x, z] }`，移动玩家     |
-| `POST /api/control`         | 时间控制，`speed` 可取 0、1、3 |
-| `POST /api/pairing`         | 在服务器本机生成一次性配对码 |
-| `POST /api/session`         | `{ code }`，配对局域网设备 |
-| `POST /api/session/logout`  | 撤销当前设备会话 |
+| 方法与路径                  | 用途                                                                               |
+| --------------------------- | ---------------------------------------------------------------------------------- |
+| `GET /api/state`            | 世界、活动、对话、回忆和公开关系状态                                               |
+| `GET /api/settings`         | 脱敏设置                                                                           |
+| `POST /api/settings`        | 保存模型连接与称呼                                                                 |
+| `POST /api/settings/test`   | 测试已保存的模型                                                                   |
+| `POST /api/chat`            | `{ text }`，文字交流                                                               |
+| `POST /api/activity`        | `{ kind }`，开始共同活动                                                           |
+| `POST /api/activity/cancel` | 结束当前活动                                                                       |
+| `POST /api/travel`          | `{ location }`，共同前往 `home` / `market` / `cinema` / `office` / `cafe` / `park` |
+| `POST /api/move`            | `{ position: [x, z] }`，移动玩家                                                   |
+| `POST /api/control`         | 时间控制，`speed` 可取 0、1、3                                                     |
+| `POST /api/pairing`         | 在服务器本机生成一次性配对码                                                       |
+| `POST /api/session`         | `{ code }`，配对局域网设备                                                         |
+| `POST /api/session/logout`  | 撤销当前设备会话                                                                   |
 
 服务端已独立于 Web 渲染，为后续 iOS 客户端保留相同的领域逻辑和接口。iOS 应用本身尚未实现；后续可先评估 Capacitor 封装，再按性能需要接入原生渲染。公网访问需要补充认证、HTTPS、会话管理、限流与合适的密钥存储。
 

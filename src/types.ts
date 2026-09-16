@@ -1,4 +1,18 @@
-export type ActivityKind = 'cook' | 'eat' | 'tea' | 'tv' | 'rest' | 'water' | 'read' | 'wash';
+export type PlaceId = 'home' | 'market' | 'cinema' | 'office' | 'cafe' | 'park';
+export type ActivityKind =
+  | 'cook'
+  | 'eat'
+  | 'tea'
+  | 'tv'
+  | 'rest'
+  | 'water'
+  | 'read'
+  | 'wash'
+  | 'shop'
+  | 'movie'
+  | 'work'
+  | 'coffee'
+  | 'stroll';
 export type Message = {
   id: string;
   role: 'assistant' | 'user';
@@ -16,6 +30,7 @@ export type Memory = {
   kind: string;
 };
 export type State = {
+  location: PlaceId;
   day: number;
   minute: number;
   speed: number;
