@@ -51,7 +51,7 @@ export async function streamComplete(settings, messages, onDelta, signal) {
     response = await fetch(`${settings.baseUrl.replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
       redirect: 'error',
-      signal: AbortSignal.any([signal, AbortSignal.timeout(45000)]),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(90000)]),
       headers: {
         'Content-Type': 'application/json',
         ...(settings.apiKey ? { Authorization: `Bearer ${settings.apiKey}` } : {}),

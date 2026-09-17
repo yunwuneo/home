@@ -15,7 +15,7 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         }),
-    signal: AbortSignal.timeout(32000),
+    signal: AbortSignal.timeout(180000),
   });
   const data = await response.json();
   if (!response.ok) throw new ApiError(data.error || '暂时无法连接到家。', data.code);
@@ -27,7 +27,7 @@ export async function chatStream<T>(body: unknown, onDelta: (text: string) => vo
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(55000),
+    signal: AbortSignal.timeout(240000),
   });
   if (!response.ok || response.headers.get('content-type')?.includes('application/json')) {
     const data = await response.json();

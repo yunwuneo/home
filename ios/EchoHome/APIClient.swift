@@ -11,7 +11,7 @@ struct APIError: LocalizedError {
   init(address: String) {
     baseURL = URL(string: address) ?? URL(string: "http://127.0.0.1:5173")!
     let config = URLSessionConfiguration.default
-    config.timeoutIntervalForRequest = 60
+    config.timeoutIntervalForRequest = 240
     config.requestCachePolicy = .reloadIgnoringLocalCacheData
     config.httpCookieStorage = .shared
     session = URLSession(configuration: config)

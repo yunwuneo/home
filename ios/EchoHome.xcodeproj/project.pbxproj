@@ -10,11 +10,14 @@
 		0C7865CBA147399555A92A5C /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0177BD311C5A84A9BB17561B /* DesignSystem.swift */; };
 		18A80B2CFAADE3FC01488213 /* EchoHomeUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36EB0E62B44D50F2D186B475 /* EchoHomeUITests.swift */; };
 		3E3C9398B3F97CC412302EFF /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C65CA25DA74A9932753F4D0 /* ChatView.swift */; };
+		46EF38AEDE068E44AC21B587 /* ChatFeaturesUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDECACB4B5113708DAD6FF72 /* ChatFeaturesUITests.swift */; };
 		4ED39EB96D34387CF028F0A6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78595986C812591DA6BA38E9 /* SettingsView.swift */; };
+		52B5D9CA07866FE70E492898 /* ChatFeatures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9808D81A5CC3228BF5F1614D /* ChatFeatures.swift */; };
 		5C330FE005DBF0BF60F5262E /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FB2DD7FC23F7B6B6F3FB05C /* HomeView.swift */; };
 		5D7C4A02E1CC68DFAD6BB408 /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39E3ECA9169EA4C931FEED21 /* AppModel.swift */; };
 		8B4647E04849975683036497 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7A4DA6A3C5F036A86D1C9F /* Models.swift */; };
 		AA8794E4B564E465BBDDBE71 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 10C9C9E000750C463F9655B0 /* Assets.xcassets */; };
+		AAC3EE5BBD49C7B3E27E4E61 /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABFC2B9C8C6B5B090611286 /* ChatModels.swift */; };
 		C88F0E1B6A9E1D1D59D63442 /* EchoHomeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D564351FED31B317200518 /* EchoHomeApp.swift */; };
 		D4561B9E11C47991F83B53CD /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03157A120A578127CC505295 /* APIClient.swift */; };
 		DD133C096D9CDA2A2ED839C5 /* TogetherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999E7C1AB6682C9896801B7 /* TogetherView.swift */; };
@@ -36,6 +39,7 @@
 		0177BD311C5A84A9BB17561B /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		03157A120A578127CC505295 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		10C9C9E000750C463F9655B0 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1ABFC2B9C8C6B5B090611286 /* ChatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
 		23D564351FED31B317200518 /* EchoHomeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EchoHomeApp.swift; sourceTree = "<group>"; };
 		2999E7C1AB6682C9896801B7 /* TogetherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TogetherView.swift; sourceTree = "<group>"; };
 		36EB0E62B44D50F2D186B475 /* EchoHomeUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EchoHomeUITests.swift; sourceTree = "<group>"; };
@@ -46,15 +50,18 @@
 		5E802E9468F79E59306F4410 /* MemoriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoriesView.swift; sourceTree = "<group>"; };
 		78595986C812591DA6BA38E9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		7FB2DD7FC23F7B6B6F3FB05C /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		9808D81A5CC3228BF5F1614D /* ChatFeatures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFeatures.swift; sourceTree = "<group>"; };
 		B5558C9AC07AB304D4B06656 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B5B3911E23CAF73DF9F89588 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		D382C3D6AC09DF12F48835E9 /* EchoHomeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EchoHomeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		DDECACB4B5113708DAD6FF72 /* ChatFeaturesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFeaturesUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
 		42A67E30C9A8E5C0AF8B6AC6 /* EchoHomeUITests */ = {
 			isa = PBXGroup;
 			children = (
+				DDECACB4B5113708DAD6FF72 /* ChatFeaturesUITests.swift */,
 				36EB0E62B44D50F2D186B475 /* EchoHomeUITests.swift */,
 			);
 			path = EchoHomeUITests;
@@ -75,6 +82,8 @@
 				03157A120A578127CC505295 /* APIClient.swift */,
 				39E3ECA9169EA4C931FEED21 /* AppModel.swift */,
 				10C9C9E000750C463F9655B0 /* Assets.xcassets */,
+				9808D81A5CC3228BF5F1614D /* ChatFeatures.swift */,
+				1ABFC2B9C8C6B5B090611286 /* ChatModels.swift */,
 				3C65CA25DA74A9932753F4D0 /* ChatView.swift */,
 				0177BD311C5A84A9BB17561B /* DesignSystem.swift */,
 				23D564351FED31B317200518 /* EchoHomeApp.swift */,
@@ -193,6 +202,8 @@
 			files = (
 				D4561B9E11C47991F83B53CD /* APIClient.swift in Sources */,
 				5D7C4A02E1CC68DFAD6BB408 /* AppModel.swift in Sources */,
+				52B5D9CA07866FE70E492898 /* ChatFeatures.swift in Sources */,
+				AAC3EE5BBD49C7B3E27E4E61 /* ChatModels.swift in Sources */,
 				3E3C9398B3F97CC412302EFF /* ChatView.swift in Sources */,
 				0C7865CBA147399555A92A5C /* DesignSystem.swift in Sources */,
 				C88F0E1B6A9E1D1D59D63442 /* EchoHomeApp.swift in Sources */,
@@ -209,6 +220,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				46EF38AEDE068E44AC21B587 /* ChatFeaturesUITests.swift in Sources */,
 				18A80B2CFAADE3FC01488213 /* EchoHomeUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

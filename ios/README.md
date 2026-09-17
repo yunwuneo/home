@@ -29,7 +29,7 @@ Swift 6 + SwiftUI + SceneKit，最低 iOS 26。没有 WebView、H5 或 JavaScrip
 - 手记搜索、分类、新增、编辑、置顶和遗忘。
 - 服务端地址、设备配对、模型配置/测试、称呼、断开设备。
 
-场景是重新制作的原生低多边形布景，不直接复用 Web 端 Three.js 的模型和逐帧动作。当前没有语音或公网账号体系，沿用项目的私人局域网配对协议。
+场景是重新制作的原生低多边形布景，不直接复用 Web 端 Three.js 的模型和逐帧动作。聊天现已支持话题、模型管理、MCP、指令、照片/文件、语义记忆及设备/云端语音（见根目录 docs/CHAT_UPGRADE.md）。当前没有公网账号体系，沿用项目的私人局域网配对协议。
 
 ## 验收
 
@@ -59,7 +59,7 @@ Liquid Glass 参考：[Apple glassEffect](https://developer.apple.com/documentat
 HOST=127.0.0.1 PORT=5189 ECHO_DATA_DIR=/tmp/echo-native-contract node server/index.mjs --production
 # 在另一个终端：
 swiftc -parse-as-library -swift-version 6 \
-  ios/EchoHome/Models.swift ios/EchoHome/APIClient.swift \
+  ios/EchoHome/ChatModels.swift ios/EchoHome/Models.swift ios/EchoHome/APIClient.swift \
   ios/Tests/ClientContractCheck.swift -o /tmp/echo-client-check
 /tmp/echo-client-check
 ```

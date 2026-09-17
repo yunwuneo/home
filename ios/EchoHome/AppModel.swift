@@ -12,7 +12,20 @@ import SwiftUI
   var partialReply = ""
   var draft = ""
   var quote: Message?
-  var failedChat: (text: String, id: String, quoteID: String?)?
+  var failedChat:
+    (text: String, id: String, quoteID: String?, topicID: String, attachments: [String])?
+  var topicID = "home"
+  var attachments: [ChatAttachment] = []
+  private var topicDrafts: [String: String] = [:]
+  func switchTopic(_ id: String) {
+    guard !sending else { return }
+    topicDrafts[topicID] = draft
+    draft = topicDrafts[id] ?? ""
+    topicID = id
+    quote = nil
+    attachments = []
+    failedChat = nil
+  }
   var lastSync: Date?
   var address: String
   var selectedTab = 0
@@ -100,20 +113,27 @@ import SwiftUI
     let pending =
       retry
       ? failedChat
-      : (draft.trimmingCharacters(in: .whitespacesAndNewlines), UUID().uuidString, quote?.id)
+      : (
+        draft.trimmingCharacters(in: .whitespacesAndNewlines), UUID().uuidString, quote?.id,
+        topicID, attachments.map(\.id)
+      )
     guard let pending, !pending.0.isEmpty, pending.0.count <= 1500 else { return }
     sending = true
     generation += 1
     partialReply = ""
     failedChat = pending
     defer { sending = false }
-    var body: [String: Any] = ["text": pending.0, "requestId": pending.1, "stream": true]
+    var body: [String: Any] = [
+      "text": pending.0, "requestId": pending.1, "stream": true, "topicId": pending.3,
+      "attachmentIds": pending.4,
+    ]
     if let quoteID = pending.2 { body["replyToId"] = quoteID }
     do {
       state = try await api.chat(body) { self.partialReply += $0 }
       if draft.trimmingCharacters(in: .whitespacesAndNewlines) == pending.0 { draft = "" }
       quote = nil
       failedChat = nil
+      attachments = []
       partialReply = ""
       online = true
       lastSync = Date()

@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { createChatHub } from './chat-hub.mjs';
 import express from 'express';
 import { z } from 'zod';
 import { openStore } from './store.mjs';
@@ -45,10 +47,15 @@ export function createApplication(dataDirectory) {
       return res.status(415).json({ error: '需要 JSON 请求。' });
     next();
   });
-  app.use(express.json({ limit: '16kb' }));
+  app.use(express.json({ limit: '15mb' }));
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/') && req.path !== '/api/session' && !access.authenticate(req))
       return res.status(401).json({ error: '请先配对这台设备。', code: 'LAN_AUTH_REQUIRED' });
+    next();
+  });
+  app.use((req, res, next) => {
+    if (chatBusy && req.method !== 'GET' && req.path !== '/api/chat')
+      return res.status(409).json({ error: '请等待 Echo 回复完成。' });
     next();
   });
   app.post('/api/pairing', (req, res) => {
@@ -73,7 +80,9 @@ export function createApplication(dataDirectory) {
     res.clearCookie('echo_session', { httpOnly: true, sameSite: 'strict', path: '/' });
     res.json({ ok: true });
   });
-  const configured = () => Boolean(store.settings.baseUrl && store.settings.model);
+  let hub;
+  const configured = () =>
+    Boolean(store.settings.baseUrl && store.settings.model) || !!hub?.configured();
   const snapshot = () => ({ ...publicState(s, configured()), chatBusy });
   const save = () => {
     store.saveState(s);
@@ -289,23 +298,43 @@ export function createApplication(dataDirectory) {
       res.status(409).json({ error: error.message });
     }
   });
+  hub = createChatHub({
+    app,
+    store,
+    s,
+    save,
+    snapshot,
+    busy: () => chatBusy,
+    directory: dataDirectory,
+  });
   app.post('/api/chat', async (req, res) => {
-    const { text, requestId, replyToId, stream } = z
+    const { text, requestId, replyToId, stream, topicId, attachmentIds } = z
       .object({
         text: z.string().trim().min(1).max(1500),
         requestId: z.string().uuid().optional(),
         replyToId: z.string().max(100).optional(),
         stream: z.boolean().default(false),
+        topicId: z.string().default('home'),
+        attachmentIds: z.array(z.string()).max(6).default([]),
       })
       .parse(req.body);
     const receipt = requestId && s.chatRequests.find((r) => r.id === requestId);
     if (receipt) {
-      if (receipt.text !== text || receipt.replyToId !== replyToId)
+      if (
+        receipt.text !== text ||
+        receipt.replyToId !== replyToId ||
+        (receipt.topicId || 'home') !== topicId ||
+        JSON.stringify(receipt.attachmentIds || []) !== JSON.stringify(attachmentIds)
+      )
         return res.status(409).json({ error: '这次发送的内容已经改变，请重新发送。' });
       return res.json(snapshot());
     }
-    if (chatBusy) return res.status(409).json({ error: 'Echo 正在回复上一句话。' });
-    const quoted = replyToId ? s.messages.find((m) => m.id === replyToId) : null;
+    if (chatBusy || hub.busy()) return res.status(409).json({ error: 'Echo 正在处理上一项请求。' });
+    if (!s.topics.some((t) => t.id === topicId))
+      return res.status(400).json({ error: '话题不存在。' });
+    const quoted = replyToId
+      ? s.messages.find((m) => m.id === replyToId && (m.topicId || 'home') === topicId)
+      : null;
     if (replyToId && !quoted)
       return res.status(400).json({ error: '引用的消息已不在当前记录中。' });
     chatBusy = true;
@@ -319,23 +348,46 @@ export function createApplication(dataDirectory) {
     try {
       // Stage facts on a snapshot so failed generations cannot partially update the save.
       const context = structuredClone(s);
-      learnFromChat(context, text);
+      const advanced =
+        hub.view().providers.length > 0 ||
+        attachmentIds.length > 0 ||
+        hub.view().instructions.length > 0 ||
+        hub.view().mcp.some((m) => m.enabled);
+      const userId = randomUUID();
+      if (!advanced && hub.view().autoMemory) learnFromChat(context, text);
+      if (stream) {
+        res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+        res.flushHeaders();
+      }
+      const prepared = advanced
+        ? await hub.prepare(
+            context,
+            { text, topicId, attachmentIds, replyToId },
+            controller.signal,
+            userId,
+          )
+        : null;
       const messages = [
         { role: 'system', content: echoPrompt(context, text) },
         ...context.messages
-          .filter((m) => !m.memoryExcluded)
+          .filter((m) => !m.memoryExcluded && (m.topicId || 'home') === topicId)
           .slice(-40)
           .map(({ role, content }) => ({ role, content })),
         ...(quoted ? [{ role: 'user', content: `本次回复引用的对话内容：${quoted.content}` }] : []),
         { role: 'user', content: text },
       ];
-      if (stream) {
-        res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
-        res.flushHeaders();
-      }
+
       let reply;
       const usingModel = configured();
-      if (usingModel)
+      if (prepared)
+        reply = await hub.respond(
+          prepared,
+          (text) => {
+            if (stream) emit({ type: 'delta', text });
+          },
+          controller.signal,
+        );
+      else if (usingModel)
         reply =
           stream && store.settings.streaming !== false
             ? await streamComplete(
@@ -347,16 +399,44 @@ export function createApplication(dataDirectory) {
             : await complete({ ...store.settings }, messages, 900);
       if (controller.signal.aborted) return;
       const userMessage = message(s, 'user', text, 'chat');
+      userMessage.id = userId;
+      userMessage.topicId = topicId;
+      if (prepared) {
+        s.memories = context.memories;
+        s.memoryVectors = context.memoryVectors;
+        for (const old of context.messages) {
+          if (old.memoryExcluded) {
+            const live = s.messages.find((m) => m.id === old.id);
+            if (live) live.memoryExcluded = true;
+          }
+        }
+        userMessage.attachments = prepared.attachments.map(({ text, ...a }) => a);
+        userMessage.extractedMemoryIds = prepared.changed;
+      }
       if (quoted)
         userMessage.replyTo = {
           id: quoted.id,
           content: quoted.content.slice(0, 300),
           role: quoted.role,
         };
-      const committed = learnFromChat(s, text, userMessage.id);
+      const committed =
+        prepared || !hub.view().autoMemory ? [] : learnFromChat(s, text, userMessage.id);
       const offlineReply = localReply(s, text, committed);
       const answer = message(s, 'assistant', reply || offlineReply, usingModel ? 'model' : 'local');
-      answer.memoryIds = relevantMemories(s, text).map((m) => m.id);
+      answer.topicId = topicId;
+      answer.memoryIds = (prepared?.recalled || relevantMemories(s, text)).map((m) => m.id);
+      if (prepared) {
+        answer.memoryUsed = prepared.recalled.map(
+          ({ id, text, score, method, sourceMessageIds }) => ({
+            id,
+            text,
+            score,
+            method,
+            sourceMessageIds,
+          }),
+        );
+        answer.toolTrace = prepared.toolTrace || [];
+      }
       if (s.companion?.pending) {
         const pending = s.companion.pending;
         addMemory(s, {
@@ -369,10 +449,13 @@ export function createApplication(dataDirectory) {
         s.companion.pending = null;
         s.companion.lastLine = answer.content;
       }
-      if (stream && (!usingModel || store.settings.streaming === false))
+      if (stream && !prepared && (!usingModel || store.settings.streaming === false))
         emit({ type: 'delta', text: answer.content });
       if (requestId)
-        s.chatRequests = [...s.chatRequests, { id: requestId, text, replyToId }].slice(-200);
+        s.chatRequests = [
+          ...s.chatRequests,
+          { id: requestId, text, replyToId, topicId, attachmentIds },
+        ].slice(-200);
       chatBusy = false;
       const state = save();
       if (stream) {
@@ -399,7 +482,7 @@ export function createApplication(dataDirectory) {
     app,
     store,
     tick(seconds = 1) {
-      if (Date.now() - lastSeen < 10000 && advance(s, seconds)) store.saveState(s);
+      if (!chatBusy && Date.now() - lastSeen < 10000 && advance(s, seconds)) store.saveState(s);
     },
     close() {
       store.saveState(s);

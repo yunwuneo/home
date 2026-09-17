@@ -23,6 +23,16 @@ export type Message = {
   replyTo?: { id: string; content: string; role: string };
   memoryIds?: string[];
   memoryExcluded?: boolean;
+  topicId?: string;
+  attachments?: { id: string; name: string; mime: string; size: number }[];
+  memoryUsed?: {
+    id: string;
+    text: string;
+    score?: number;
+    method?: string;
+    sourceMessageIds?: string[];
+  }[];
+  toolTrace?: { server: string; name: string; result: string }[];
 };
 export type Memory = {
   id: string;
@@ -36,6 +46,12 @@ export type Memory = {
   updatedDay?: number;
 };
 export type State = {
+  topics?: {
+    id: string;
+    title: string;
+    model?: { providerId: string; model: string };
+    mcpIds?: string[];
+  }[];
   location: PlaceId;
   day: number;
   minute: number;

@@ -14,6 +14,7 @@ struct WorldState: Decodable, Sendable {
   var meals: Int
   var mood: String
   var relationship: String
+  var topics: [ChatTopic]?
   var messages: [Message]
   var memories: [Memory]
   var preferences: [String]
@@ -38,6 +39,10 @@ struct Message: Decodable, Identifiable, Sendable {
   let source: String
   let day: Int
   let minute: Double
+  let topicId: String?
+  let attachments: [ChatAttachment]?
+  let memoryUsed: [RecalledMemory]?
+  let toolTrace: [ToolTrace]?
   let replyTo: Quote?
   struct Quote: Decodable, Sendable {
     let id: String

@@ -50,7 +50,7 @@ export function initialState() {
 }
 export function message(s, role, content, source = 'life') {
   s.messages.push({ id: randomUUID(), role, content, source, day: s.day, minute: s.minute });
-  s.messages = s.messages.slice(-500);
+  // Chat topics retain their full history; provider context is bounded separately.
   return s.messages.at(-1);
 }
 export function remember(s, title, text, kind = 'daily') {
@@ -192,7 +192,18 @@ export function advance(s, seconds) {
   return true;
 }
 export function publicState(s, configured) {
-  const { warmth, lastAuto, elapsed, game, chatRequests, conversation, companion, ...rest } = s;
+  const {
+    warmth,
+    lastAuto,
+    elapsed,
+    game,
+    chatRequests,
+    conversation,
+    companion,
+    memoryVectors,
+    attachments,
+    ...rest
+  } = s;
   return {
     ...rest,
     game: publicGame(game),

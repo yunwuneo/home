@@ -51,6 +51,13 @@ export function openStore(directory) {
     saveSettings(settings) {
       put('settings', { ...settings, apiKey: encrypt(settings.apiKey) });
     },
+    readSecret(name, fallback) {
+      const value = get(name, null);
+      return value ? JSON.parse(decrypt(value)) : fallback;
+    },
+    saveSecret(name, value) {
+      put(name, encrypt(JSON.stringify(value)));
+    },
     readSessions() {
       return get('lanSessions', []);
     },

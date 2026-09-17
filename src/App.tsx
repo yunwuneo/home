@@ -1,3 +1,4 @@
+import { ChatTools, MessageExtras, type Attachment } from './ChatTools';
 import {
   Component,
   lazy,
@@ -445,6 +446,19 @@ export default function App() {
   const [autoScroll, setAutoScroll] = useState(true),
     [unread, setUnread] = useState(false);
   const [streamed, setStreamed] = useState('');
+  const [topicId, setTopicId] = useState('home');
+  const [chatToolBusy, setChatToolBusy] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const topicDrafts = useRef<Record<string, string>>({});
+  function switchTopic(id: string) {
+    topicDrafts.current[topicId] = draft;
+    setDraft(topicDrafts.current[id] || '');
+    setTopicId(id);
+    setQuote(null);
+    setAttachments([]);
+    setFailedMessage(null);
+  }
+
   const [quote, setQuote] = useState<State['messages'][number] | null>(null);
   const [chatSearch, setChatSearch] = useState(''),
     [showChatSearch, setShowChatSearch] = useState(false);
@@ -452,6 +466,8 @@ export default function App() {
     text: string;
     requestId: string;
     replyToId?: string;
+    topicId?: string;
+    attachmentIds?: string[];
   } | null>(null);
   const sendingRef = useRef(false),
     actingRef = useRef(false);
@@ -574,13 +590,24 @@ export default function App() {
     await action('/activity', { kind });
   }
   async function send(text: string, retry = false) {
-    if (!text.trim() || sendingRef.current) return;
+    if (!text.trim() || sendingRef.current || chatToolBusy) return;
     const value = text.trim();
     const request =
       failedMessage &&
-      (retry || (failedMessage.text === value && failedMessage.replyToId === quote?.id))
+      (retry ||
+        (failedMessage.text === value &&
+          failedMessage.replyToId === quote?.id &&
+          failedMessage.topicId === topicId &&
+          JSON.stringify(failedMessage.attachmentIds || []) ===
+            JSON.stringify(attachments.map((a) => a.id))))
         ? failedMessage
-        : { text: value, requestId: requestUuid(), replyToId: quote?.id };
+        : {
+            text: value,
+            requestId: requestUuid(),
+            replyToId: quote?.id,
+            topicId,
+            attachmentIds: attachments.map((a) => a.id),
+          };
     sendingRef.current = true;
     setSending(true);
     setPendingMessage(value);
@@ -596,6 +623,7 @@ export default function App() {
         ),
       );
       setQuote(null);
+      setAttachments([]);
       setConnected(true);
     } catch (e) {
       setDraft(value);
@@ -667,7 +695,9 @@ export default function App() {
     ? ['还记得我喜欢什么吗？', '今天和你一起很开心。', '你现在在想什么？']
     : ['今天想做什么？', '你喜欢这个家吗？', '我喜欢抹茶。'];
   const chatMessages = state.messages.filter(
-    (m) => !chatSearch || m.content.toLowerCase().includes(chatSearch.toLowerCase()),
+    (m) =>
+      (m.topicId || 'home') === topicId &&
+      (!chatSearch || m.content.toLowerCase().includes(chatSearch.toLowerCase())),
   );
   return (
     <div className={`app ${mobileChat ? 'chat-open' : ''}`}>
@@ -1199,6 +1229,17 @@ export default function App() {
               <Settings2 size={12} />
             </button>
           </div>
+          <ChatTools
+            state={state}
+            topicId={topicId}
+            onTopic={switchTopic}
+            onState={setState}
+            onBusy={setChatToolBusy}
+            attachments={attachments}
+            onAttachments={setAttachments}
+            onText={(text) => setDraft((v) => v + text)}
+            disabled={sending || acting}
+          />
           <div className="chat-date">
             <span />第 {state.day} 天 · {place.name}
             <span />
@@ -1254,6 +1295,7 @@ export default function App() {
                     <blockquote className="quoted-message">{m.replyTo.content}</blockquote>
                   )}
                   <p>{m.content}</p>
+                  <MessageExtras message={m} messages={state.messages} />
                   <div className="message-actions">
                     <button
                       title="引用回复"
@@ -1440,7 +1482,7 @@ export default function App() {
                 <button
                   type="submit"
                   aria-label="发送消息"
-                  disabled={sending || !draft.trim() || !connected}
+                  disabled={sending || chatToolBusy || !draft.trim() || !connected}
                 >
                   {sending ? <LoaderCircle size={16} className="spin" /> : <Send size={16} />}
                 </button>
