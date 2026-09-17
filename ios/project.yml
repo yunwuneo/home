@@ -6,7 +6,8 @@ options:
 settings:
   base:
     SWIFT_VERSION: '6.0'
-    DEVELOPMENT_TEAM: ''
+    DEVELOPMENT_TEAM: FQ6BA9L999
+    CODE_SIGN_STYLE: Automatic
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     TARGETED_DEVICE_FAMILY: '1,2'
 targets:
@@ -17,6 +18,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.echohome.native
+        MARKETING_VERSION: '0.1.0'
+        CURRENT_PROJECT_VERSION: '1'
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: EchoHome/Info.plist
         INFOPLIST_KEY_CFBundleDisplayName: '和 Echo 的家'

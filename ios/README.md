@@ -11,6 +11,25 @@ Swift 6 + SwiftUI + SceneKit，最低 iOS 26。没有 WebView、H5 或 JavaScrip
 
 工程文件已提交，日常不需要 XcodeGen。新增文件或修改项目结构后，可运行 `xcodegen generate --spec ios/project.yml` 再生成工程。
 
+## TestFlight 发布
+
+App Store Connect 应用为「和 Echo 的家」（Apple ID `6813135578`），Bundle ID 为 `com.echohome.native`，签名团队为 `FQ6BA9L999`。工程使用自动签名，版本号与构建号在 `project.yml` 中维护；每次上传新构建前递增 `CURRENT_PROJECT_VERSION` 并重新生成工程。
+
+发布构建使用 Apple 当前支持的正式版或 RC 工具链。本次采用 Xcode 27（27A266a）；旧的 Xcode 27 beta 6（27A5252f）曾被上传服务以不支持的 SDK/Xcode 版本拒绝。
+
+选择 EchoHome scheme、Any iOS Device，使用 Product → Archive，然后在 Organizer 中上传至 App Store Connect。也可使用命令行归档：
+
+```sh
+xcodebuild -project ios/EchoHome.xcodeproj -scheme EchoHome \
+  -configuration Release -destination 'generic/platform=iOS' \
+  -archivePath artifacts/testflight/EchoHome.xcarchive \
+  -allowProvisioningUpdates archive
+```
+
+在 [TestFlight](https://appstoreconnect.apple.com/apps/6813135578/testflight) 查看处理状态并管理测试构建。安装设备需 iOS 26 或更新版本；TestFlight 仅分发客户端，服务端仍须持续运行，真机需在设置里填写可访问的服务端地址并完成配对。
+
+`PrivacyInfo.xcprivacy` 声明 UserDefaults 仅用于本 App 的设置存储。客户端仅使用系统提供的网络加密，`ITSAppUsesNonExemptEncryption` 设置为 `NO`；若以后加入自定义加密或其他需要声明的 API，应同步复核这些发布声明。
+
 ## 数据流
 
 `APIClient` 使用 URLSession 访问现有 `/api`，保留 HttpOnly 配对 Cookie。App 不在本地推进世界、判断棋步、翻出隐藏牌、计算调饮成绩或结算关系奖励。

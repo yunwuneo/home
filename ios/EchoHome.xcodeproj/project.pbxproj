@@ -20,6 +20,7 @@
 		AAC3EE5BBD49C7B3E27E4E61 /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1ABFC2B9C8C6B5B090611286 /* ChatModels.swift */; };
 		C88F0E1B6A9E1D1D59D63442 /* EchoHomeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D564351FED31B317200518 /* EchoHomeApp.swift */; };
 		D4561B9E11C47991F83B53CD /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03157A120A578127CC505295 /* APIClient.swift */; };
+		D4DD43859A0D835098945330 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = FE54F094D7D77B875B22A5F9 /* PrivacyInfo.xcprivacy */; };
 		DD133C096D9CDA2A2ED839C5 /* TogetherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2999E7C1AB6682C9896801B7 /* TogetherView.swift */; };
 		E43527C408D286B99DBB03A1 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5B3911E23CAF73DF9F89588 /* RootView.swift */; };
 		F2EB2FE28F83C5BC558901B2 /* MemoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E802E9468F79E59306F4410 /* MemoriesView.swift */; };
@@ -55,6 +56,7 @@
 		B5B3911E23CAF73DF9F89588 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		D382C3D6AC09DF12F48835E9 /* EchoHomeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EchoHomeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		DDECACB4B5113708DAD6FF72 /* ChatFeaturesUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatFeaturesUITests.swift; sourceTree = "<group>"; };
+		FE54F094D7D77B875B22A5F9 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -91,6 +93,7 @@
 				B5558C9AC07AB304D4B06656 /* Info.plist */,
 				5E802E9468F79E59306F4410 /* MemoriesView.swift */,
 				3F7A4DA6A3C5F036A86D1C9F /* Models.swift */,
+				FE54F094D7D77B875B22A5F9 /* PrivacyInfo.xcprivacy */,
 				B5B3911E23CAF73DF9F89588 /* RootView.swift */,
 				78595986C812591DA6BA38E9 /* SettingsView.swift */,
 				2999E7C1AB6682C9896801B7 /* TogetherView.swift */,
@@ -156,10 +159,12 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					9C6071F942AD29474A91A6C9 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = FQ6BA9L999;
+						ProvisioningStyle = Automatic;
 					};
 					A58F18C1889ED4471FB8A3E1 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = FQ6BA9L999;
+						ProvisioningStyle = Automatic;
 						TestTargetID = 9C6071F942AD29474A91A6C9;
 					};
 				};
@@ -190,6 +195,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA8794E4B564E465BBDDBE71 /* Assets.xcassets in Resources */,
+				D4DD43859A0D835098945330 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -275,6 +281,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = EchoHome/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "和 Echo 的家";
@@ -286,6 +293,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.echohome.native;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -325,9 +333,10 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = FQ6BA9L999;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -384,9 +393,10 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = FQ6BA9L999;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -422,6 +432,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = EchoHome/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "和 Echo 的家";
@@ -433,6 +444,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.echohome.native;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
